@@ -1,0 +1,242 @@
+
+import { Extension, BlogPost } from './types';
+
+export const BRAND_LINKS = {
+  mainSite: 'https://extensionto.com',
+  twitter: 'https://twitter.com/extensionto',
+  github: 'https://github.com/extensionto'
+};
+
+const ARTICLE_PRIVACY_CHROME = `
+  <h2>Why Privacy Matters in 2024</h2>
+  <p>Your browser is the primary gateway to your digital identity. Protecting it isn't just a suggestion; it's a necessity in the age of persistent tracking.</p>
+  
+  <p>When selecting tools, you should look for specific markers of quality. We've detailed these in our guide on 
+    <a href="#blog/how-to-choose-extensions">Choosing Secure Extensions</a>.
+  </p>
+
+  <img src="https://images.unsplash.com/photo-1633265486064-086b219458ec" alt="Chrome Privacy Protection" />
+  
+  <p>Beyond privacy, performance is key. Our <a href="#home">Main Directory</a> only lists extensions that pass our strict CPU-usage benchmarks.</p>
+`;
+
+const ARTICLE_SECURITY_TIPS = `
+  <h2>Vetting Browser Tools for Safety</h2>
+  <p>Not every extension on the Chrome Web Store is safe. Malicious actors often use useful-looking tools to inject trackers.</p>
+  
+  <p>Our verification process is based on the standards we've outlined in the 
+    <a href="#blog/privacy-guide-2024">Complete Privacy Guide</a>.
+  </p>
+
+  <img src="https://images.unsplash.com/photo-1563986768609-322da13575f3" alt="Security Standards" />
+  
+  <p>Always remember: if an extension asks for more permissions than it needs, it's a red flag.</p>
+`;
+
+export const BLOG_POSTS: BlogPost[] = [
+  {
+    id: 'privacy-guide-2024',
+    title: 'The Ultimate Privacy Guide for Chrome Users in 2024',
+    excerpt: 'Learn how to protect your data and prevent invasive tracking with simple, actionable steps.',
+    content: ARTICLE_PRIVACY_CHROME,
+    category: 'Security',
+    date: 'May 12, 2024',
+    publishDate: '2024-05-12T10:00:00Z',
+    readTime: '8 min read',
+    image: 'https://images.unsplash.com/photo-1633265486064-086b219458ec?auto=format&fit=crop&q=80&w=800'
+  },
+  {
+    id: 'how-to-choose-extensions',
+    title: 'How to Choose the Most Secure Browser Extensions',
+    excerpt: 'We share our internal framework for vetting tools before recommending them to professionals.',
+    content: ARTICLE_SECURITY_TIPS,
+    category: 'Guides',
+    date: 'March 20, 2024',
+    publishDate: '2024-03-20T10:00:00Z',
+    readTime: '6 min read',
+    image: 'https://images.unsplash.com/photo-1563986768609-322da13575f3?auto=format&fit=crop&q=80&w=800'
+  }
+];
+
+export const EXTENSIONS: Extension[] = [
+  {
+    id: 'u-block-origin',
+    name: 'uBlock Origin',
+    shortDescription: 'Efficient wide-spectrum content blocker. Lean on resources.',
+    longDescription: 'uBlock Origin is an open-source, multi-platform browser extension for content-filtering, including ad-blocking.',
+    icon: '🛡️',
+    rating: 4.9,
+    users: '10M+',
+    category: 'Privacy',
+    features: ['Ad Blocking', 'Low Memory', 'Open Source'],
+    version: '1.55.0',
+    lastUpdated: 'Feb 2024',
+    size: '3.2MB',
+    storeUrl: 'https://chromewebstore.google.com/detail/ublock-origin/cjpallnbpafiamejdnhcphjbkeiagm'
+  },
+  {
+    id: 'bitwarden',
+    name: 'Bitwarden',
+    shortDescription: 'Secure and open-source password management for all devices.',
+    longDescription: 'Bitwarden is the easiest and safest way to store all of your logins and passwords while keeping them synced between all of your devices.',
+    icon: '🔑',
+    rating: 4.8,
+    users: '2M+',
+    category: 'Security',
+    features: ['End-to-end Encryption', 'Password Sync', 'Secure Sharing'],
+    version: '2024.1.0',
+    lastUpdated: 'Jan 2024',
+    size: '5.1MB',
+    storeUrl: 'https://chromewebstore.google.com/detail/bitwarden-free-password-m/nngceckbapebfimnlniiiahkandclnce'
+  },
+  {
+    id: 'quick-screenshot-lite',
+    name: 'Quick Screenshot Lite',
+    shortDescription: 'Capture high-quality screenshots of any webpage instantly.',
+    longDescription: 'A lightweight and fast tool for capturing whole pages or specific regions with one click. Ideal for designers and developers.',
+    icon: '📸',
+    rating: 4.7,
+    users: '100K+',
+    category: 'Productivity',
+    features: ['Region Capture', 'Auto-save', 'Annotations'],
+    version: '2.1.4',
+    lastUpdated: 'Mar 2024',
+    size: '1.8MB',
+    storeUrl: 'https://chromewebstore.google.com/detail/quick-screenshot-lite/hddickadgkbfpcelmckpjhcfnoeognee'
+  },
+  {
+    id: 'redirect-shield',
+    name: 'Redirect Shield',
+    shortDescription: 'Stop annoying auto-redirects and keep your browsing focused.',
+    longDescription: 'Automatically detects and blocks unwanted URL redirections that try to take you away from your current content.',
+    icon: '🛑',
+    rating: 4.6,
+    users: '50K+',
+    category: 'Security',
+    features: ['Auto-block', 'Whitelist', 'Safe Navigation'],
+    version: '1.0.8',
+    lastUpdated: 'Feb 2024',
+    size: '1.1MB',
+    storeUrl: 'https://chromewebstore.google.com/detail/redirect-shield-stop-auto/pofolffdhjffglfphiagpbnlegjbnbhp'
+  },
+  {
+    id: 'formula-builder-pro',
+    name: 'Formula Builder Pro',
+    shortDescription: 'Advanced mathematical formula builder for students and engineers.',
+    longDescription: 'Create complex mathematical notation directly in your browser and export to LaTeX, Image, or plain text.',
+    icon: '📐',
+    rating: 4.9,
+    users: '20K+',
+    category: 'Utility',
+    features: ['LaTeX Export', 'Auto-completion', 'Live Preview'],
+    version: '3.4.0',
+    lastUpdated: 'Jan 2024',
+    size: '4.5MB',
+    storeUrl: 'https://chromewebstore.google.com/detail/formula-builder-pro/ecmfloopolmkamoklcepdonahkigjlnn'
+  },
+  {
+    id: 'light-popup-blocker',
+    name: 'Light Popup Blocker',
+    shortDescription: 'A tiny yet powerful blocker for invasive popups and overlays.',
+    longDescription: 'Zero-config popup blocker that uses minimal CPU while keeping your screen free of distractions and ads.',
+    icon: '✨',
+    rating: 4.8,
+    users: '80K+',
+    category: 'Privacy',
+    features: ['Stealth Mode', 'Overlay Detection', 'Lightweight'],
+    version: '2.2.1',
+    lastUpdated: 'Mar 2024',
+    size: '0.9MB',
+    storeUrl: 'https://chromewebstore.google.com/detail/light-popup-blocker/oimngcokgckajdlphggpjpbeljoakpii'
+  },
+  {
+    id: 'protab-suspender',
+    name: 'ProTab Suspender',
+    shortDescription: 'Save up to 80% memory by suspending inactive browser tabs.',
+    longDescription: 'Automatically puts background tabs to sleep to free up system resources, making your browser feel significantly faster.',
+    icon: '🧊',
+    rating: 4.7,
+    users: '300K+',
+    category: 'Performance',
+    features: ['Memory Savings', 'Auto-wake', 'Custom Timers'],
+    version: '5.1.2',
+    lastUpdated: 'Feb 2024',
+    size: '2.7MB',
+    storeUrl: 'https://chromewebstore.google.com/detail/protab-suspender-memory-s/gghjdfjjffegohpjhmcmgeonmcomilgj'
+  },
+  {
+    id: 'securakey-pro',
+    name: 'SecuraKey Pro',
+    shortDescription: 'Enterprise-grade password management for professional teams.',
+    longDescription: 'Manage shared credentials securely with military-grade encryption and advanced audit logs.',
+    icon: '🔐',
+    rating: 4.9,
+    users: '150K+',
+    category: 'Security',
+    features: ['Team Sharing', 'Audit Logs', 'Biometric Support'],
+    version: '4.0.0',
+    lastUpdated: 'Mar 2024',
+    size: '6.2MB',
+    storeUrl: 'https://chromewebstore.google.com/detail/securakey-pro-password-ma/omeencccnkninlofbggfcfiohapajhgi'
+  },
+  {
+    id: 'offline-reader-pro',
+    name: 'Offline Reader Pro',
+    shortDescription: 'Save any website for distraction-free offline reading.',
+    longDescription: 'Automatically converts pages to a clean text format and saves them for when you don\'t have an internet connection.',
+    icon: '📖',
+    rating: 4.5,
+    users: '40K+',
+    category: 'Productivity',
+    features: ['Read Offline', 'Pure Text Mode', 'Library Sync'],
+    version: '1.3.5',
+    lastUpdated: 'Jan 2024',
+    size: '3.8MB',
+    storeUrl: 'https://chromewebstore.google.com/detail/offline-reader-pro/bgbojccanmjdniomhccefkakjaedajhf'
+  },
+  {
+    id: 'clean-all-cache',
+    name: 'Clean All - Cache Cleaner',
+    shortDescription: 'One-click solution to clear history, cache, and cookies.',
+    longDescription: 'Keep your browser running fast and your privacy secure by clearing redundant data in a single click.',
+    icon: '🧹',
+    rating: 4.7,
+    users: '200K+',
+    category: 'Utility',
+    features: ['Instant Clean', 'Secure Deletion', 'Scheduled Tasks'],
+    version: '2.8.9',
+    lastUpdated: 'Mar 2024',
+    size: '1.2MB',
+    storeUrl: 'https://chromewebstore.google.com/detail/mlmiefaloipcahfcgfbccadnnjgpipge'
+  },
+  {
+    id: 'auto-dark-mode',
+    name: 'Auto Dark Mode Switcher',
+    shortDescription: 'Intelligent dark mode that follows your system preferences.',
+    longDescription: 'Automatically switches websites to dark mode based on the time of day or your system-wide theme settings.',
+    icon: '🌗',
+    rating: 4.8,
+    users: '120K+',
+    category: 'Utility',
+    features: ['Schedule Sync', 'Contrast Control', 'Low Blue Light'],
+    version: '3.0.1',
+    lastUpdated: 'Feb 2024',
+    size: '2.1MB',
+    storeUrl: 'https://chromewebstore.google.com/detail/auto-dark-mode-switcher-u/obbhliekbfgpcdippngphefofiicgjml'
+  },
+  {
+    id: 'dark-reader',
+    name: 'Dark Reader',
+    shortDescription: 'Dark mode for every website. Take care of your eyes.',
+    longDescription: 'Dark Reader inverts bright colors making them high contrast and easy to read at night.',
+    icon: '🌙',
+    rating: 4.8,
+    users: '5M+',
+    category: 'Productivity',
+    features: ['Eye Protection', 'Custom Filters', 'High Contrast'],
+    version: '4.9.77',
+    lastUpdated: 'Mar 2024',
+    size: '2.4MB',
+    storeUrl: 'https://chromewebstore.google.com/detail/dark-reader/eimadpbcbfnmbkopoojfekhnkhdbieeh'
+  }
+];
