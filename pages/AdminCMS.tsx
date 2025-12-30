@@ -19,18 +19,21 @@ const AdminCMS: React.FC = () => {
   });
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [view, setView] = useState<'list' | 'edit' | 'preview' | 'json' | 'vercel'>('list');
+  const [view, setView] = useState<'list' | 'edit' | 'preview' | 'json' | 'help'>('list');
   const [currentEditItem, setCurrentEditItem] = useState<any>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'Saved' | 'Saving...' | 'Unsaved'>('Saved');
 
-  // Persistence
+  // Persistence logic with "Saving" indicator
   useEffect(() => {
-    localStorage.setItem('cms_blog_posts', JSON.stringify(blogItems));
-  }, [blogItems]);
-
-  useEffect(() => {
-    localStorage.setItem('cms_extensions', JSON.stringify(extensionItems));
-  }, [extensionItems]);
+    setSaveStatus('Saving...');
+    const timer = setTimeout(() => {
+      localStorage.setItem('cms_blog_posts', JSON.stringify(blogItems));
+      localStorage.setItem('cms_extensions', JSON.stringify(extensionItems));
+      setSaveStatus('Saved');
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [blogItems, extensionItems]);
 
   const filteredItems = useMemo(() => {
     const items = activeTab === 'blog' ? blogItems : extensionItems;
@@ -39,86 +42,86 @@ const AdminCMS: React.FC = () => {
     );
   }, [activeTab, blogItems, extensionItems, searchQuery]);
 
-  // AI Content Generation with Gemini
+  // AI Brain for the CMS
   const generateAIContent = async () => {
     setIsGenerating(true);
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+      const modelName = activeTab === 'blog' ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
+      
       const prompt = activeTab === 'blog' 
-        ? `Act as a senior tech writer. Write a comprehensive blog article in HTML format for the title: "${currentEditItem.title}". Use semantic tags like <h2>, <p>, and <ul>. The tone should be authoritative yet accessible. Focus on browser security and privacy trends in 2024.`
-        : `Generate a high-converting, professional short description (max 160 chars) for a browser extension named "${currentEditItem.name}". Highlight its unique selling points: Privacy, Speed, and User Experience.`;
+        ? `Write a full SEO-optimized blog article in HTML for "${currentEditItem.title}". Include <h2>, <ul>, and <p> tags. Topic: Browser Privacy & Productivity.`
+        : `Write a 160-character marketing description for a tool named "${currentEditItem.name}". Focus on benefits for professionals.`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: prompt,
-        config: {
-            temperature: 0.7,
-            topP: 0.95,
-            topK: 64
-        }
+        model: modelName,
+        contents: prompt
       });
 
       const text = response.text || "";
       if (activeTab === 'blog') {
-        setCurrentEditItem({ ...currentEditItem, content: text });
+        setCurrentEditItem({ ...currentEditItem, content: text, excerpt: text.substring(0, 150).replace(/<[^>]*>?/gm, '') + '...' });
       } else {
         setCurrentEditItem({ ...currentEditItem, shortDescription: text });
       }
     } catch (error) {
-      console.error("AI Generation failed", error);
-      alert("AI limit reached or API key missing. Please check your console.");
+      alert("Please ensure your API Key is active in the environment.");
     } finally {
       setIsGenerating(false);
     }
   };
 
   const handleEdit = (item: any) => {
-    setCurrentEditItem(item);
+    setCurrentEditItem({ ...item });
     setView('edit');
   };
 
   const handleAddNew = () => {
     const newItem = activeTab === 'blog' ? {
       id: `post-${Date.now()}`,
-      title: 'New Smart Article',
-      excerpt: '',
-      content: '',
+      title: 'Untilted Article',
+      excerpt: 'Short summary here...',
+      content: '<p>Start writing your story...</p>',
       category: 'Guides',
-      date: new Date().toLocaleDateString(),
+      date: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
       publishDate: new Date().toISOString(),
       readTime: '5 min read',
-      image: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e'
+      image: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085'
     } : {
       id: `ext-${Date.now()}`,
-      name: 'New Smart Extension',
-      shortDescription: '',
-      longDescription: '',
-      icon: '🚀',
+      name: 'New Extension',
+      shortDescription: 'Brief description...',
+      longDescription: 'Full details here...',
+      icon: '✨',
       rating: 5.0,
-      users: '0',
+      users: '100+',
       category: 'Utility',
-      features: ['Privacy Shield', 'Ultra Light'],
+      features: ['Privacy First', 'Fast'],
       version: '1.0.0',
-      lastUpdated: 'Today',
-      size: '1.0MB',
-      storeUrl: ''
+      lastUpdated: 'Current Month',
+      size: '1.2MB',
+      storeUrl: '#'
     };
     setCurrentEditItem(newItem);
     setView('edit');
   };
 
-  const handleSave = () => {
+  const handleSaveToLocal = () => {
     if (activeTab === 'blog') {
-      const exists = blogItems.find(i => i.id === currentEditItem.id);
-      if (exists) {
-        setBlogItems(blogItems.map(i => i.id === currentEditItem.id ? currentEditItem : i));
+      const exists = blogItems.findIndex(i => i.id === currentEditItem.id);
+      if (exists !== -1) {
+        const updated = [...blogItems];
+        updated[exists] = currentEditItem;
+        setBlogItems(updated);
       } else {
         setBlogItems([currentEditItem, ...blogItems]);
       }
     } else {
-      const exists = extensionItems.find(i => i.id === currentEditItem.id);
-      if (exists) {
-        setExtensionItems(extensionItems.map(i => i.id === currentEditItem.id ? currentEditItem : i));
+      const exists = extensionItems.findIndex(i => i.id === currentEditItem.id);
+      if (exists !== -1) {
+        const updated = [...extensionItems];
+        updated[exists] = currentEditItem;
+        setExtensionItems(updated);
       } else {
         setExtensionItems([currentEditItem, ...extensionItems]);
       }
@@ -127,239 +130,292 @@ const AdminCMS: React.FC = () => {
   };
 
   return (
-    <div className="flex min-h-screen bg-[#F7F9FA]">
-      {/* Sidebar */}
-      <aside className="w-64 bg-[#1B2733] text-gray-300 flex flex-col fixed inset-y-0 shadow-2xl z-20">
-        <div className="p-6 border-b border-gray-700/50 flex items-center gap-3">
-          <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-blue-500/20">C</div>
-          <span className="font-bold text-white tracking-tight">Contentful Hub</span>
+    <div className="flex min-h-screen bg-gray-50 text-gray-900 font-sans selection:bg-blue-100">
+      {/* Dynamic Sidebar */}
+      <aside className="w-72 bg-gray-900 text-white flex flex-col fixed inset-y-0 z-30 shadow-2xl">
+        <div className="p-8 border-b border-gray-800 flex items-center gap-4">
+          <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center text-xl font-black shadow-lg shadow-blue-500/30 italic">ET</div>
+          <div>
+            <h2 className="font-black tracking-tight text-lg">ExtensionTo</h2>
+            <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Admin Dashboard</p>
+          </div>
         </div>
         
-        <nav className="flex-grow p-4 space-y-1">
-          <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-2 mb-2">Editor</div>
-          <button onClick={() => {setActiveTab('blog'); setView('list');}} className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all ${activeTab === 'blog' && view === 'list' ? 'bg-[#2D3E4F] text-white' : 'hover:bg-[#243444]'}`}>
-            <span>📝</span> Blog Posts
+        <nav className="flex-grow p-6 space-y-2">
+          <div className="text-[10px] font-black text-gray-600 uppercase tracking-[0.2em] mb-4 ml-2">Content Manager</div>
+          <button 
+            onClick={() => {setActiveTab('blog'); setView('list');}} 
+            className={`w-full flex items-center gap-4 px-4 py-3 rounded-2xl transition-all font-bold text-sm ${activeTab === 'blog' && view === 'list' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+          >
+            <span className="text-lg">📄</span> Articles
           </button>
-          <button onClick={() => {setActiveTab('extension'); setView('list');}} className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all ${activeTab === 'extension' && view === 'list' ? 'bg-[#2D3E4F] text-white' : 'hover:bg-[#243444]'}`}>
-            <span>🧩</span> Extensions
+          <button 
+            onClick={() => {setActiveTab('extension'); setView('list');}} 
+            className={`w-full flex items-center gap-4 px-4 py-3 rounded-2xl transition-all font-bold text-sm ${activeTab === 'extension' && view === 'list' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+          >
+            <span className="text-lg">🧩</span> Extensions
           </button>
           
-          <div className="pt-8 text-[10px] font-bold text-gray-500 uppercase tracking-widest px-2 mb-2">Production</div>
-          <button onClick={() => setView('vercel')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all ${view === 'vercel' ? 'bg-[#2D3E4F] text-white' : 'hover:bg-[#243444]'}`}>
-            <span>▲</span> Vercel Deploy
+          <div className="pt-10 text-[10px] font-black text-gray-600 uppercase tracking-[0.2em] mb-4 ml-2">Release Control</div>
+          <button 
+            onClick={() => setView('json')} 
+            className={`w-full flex items-center gap-4 px-4 py-3 rounded-2xl transition-all font-bold text-sm ${view === 'json' ? 'bg-gray-800 text-white border border-gray-700' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+          >
+            <span className="text-lg">🚀</span> Export Data
           </button>
-          <button onClick={() => setView('json')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all ${view === 'json' ? 'bg-[#2D3E4F] text-white' : 'hover:bg-[#243444]'}`}>
-            <span>🚀</span> Export JSON
+          <button 
+            onClick={() => setView('help')} 
+            className="w-full flex items-center gap-4 px-4 py-3 rounded-2xl transition-all font-bold text-sm text-gray-400 hover:bg-gray-800 hover:text-white"
+          >
+            <span className="text-lg">❓</span> How to Deploy
           </button>
         </nav>
 
-        <div className="p-4 border-t border-gray-700/50">
-          <div className="bg-gray-800/50 rounded-xl p-3 flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-[10px] font-bold text-white">ADM</div>
-            <div className="flex flex-col">
-              <span className="text-xs font-bold text-white">Vercel Admin</span>
-              <div className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
-                <span className="text-[9px] text-gray-500 uppercase">Live Preview</span>
-              </div>
-            </div>
+        <div className="p-6 border-t border-gray-800">
+          <div className="bg-gray-800/50 p-4 rounded-2xl flex items-center gap-3 border border-gray-800">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+            <span className="text-xs font-bold text-gray-300">System Live: Vercel Static</span>
           </div>
         </div>
       </aside>
 
-      <main className="flex-grow ml-64 p-8">
+      <main className="flex-grow ml-72 p-12 overflow-y-auto">
         {view === 'list' && (
-          <>
-            <header className="flex justify-between items-center mb-10">
+          <div className="animate-in fade-in slide-in-from-top-4 duration-500">
+            <header className="flex justify-between items-end mb-12">
               <div>
-                <h1 className="text-3xl font-black text-gray-900 capitalize tracking-tight">{activeTab} Entries</h1>
-                <p className="text-sm text-gray-500">Edit content for your static production site.</p>
+                <h1 className="text-4xl font-black text-gray-900 tracking-tight">Managing {activeTab}s</h1>
+                <p className="text-gray-500 font-medium mt-2">Create and edit the core content of your static directory.</p>
               </div>
-              <button onClick={handleAddNew} className="bg-blue-600 text-white px-6 py-3 rounded-xl text-sm font-bold hover:bg-blue-700 transition-all flex items-center gap-2 shadow-xl shadow-blue-500/20">
-                <span>+</span> Create New
-              </button>
+              <div className="flex items-center gap-4">
+                <span className={`text-[10px] font-black uppercase px-2 py-1 rounded-full ${saveStatus === 'Saved' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                  {saveStatus}
+                </span>
+                <button 
+                  onClick={handleAddNew} 
+                  className="bg-gray-900 text-white px-8 py-3.5 rounded-2xl font-bold hover:bg-black transition-all shadow-xl shadow-gray-200 flex items-center gap-2"
+                >
+                  <span className="text-lg">+</span> Add New Entry
+                </button>
+              </div>
             </header>
 
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="p-4 border-b border-gray-100 flex items-center gap-4 bg-gray-50/50">
-                <input 
-                  type="text" 
-                  placeholder="Filter content..."
-                  className="flex-grow pl-4 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="bg-gray-50 text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100">
-                    <th className="px-6 py-4">Status</th>
-                    <th className="px-6 py-4">Title / Name</th>
-                    <th className="px-6 py-4">Category</th>
-                    <th className="px-6 py-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {filteredItems.map((item: any) => (
-                    <tr key={item.id} className="hover:bg-blue-50/30 transition-colors group">
-                      <td className="px-6 py-4">
-                        <span className="px-2 py-0.5 bg-green-100 text-green-700 text-[9px] font-bold rounded uppercase">Local</span>
-                      </td>
-                      <td className="px-6 py-4 text-sm font-semibold text-gray-900">{item.title || item.name}</td>
-                      <td className="px-6 py-4 text-xs text-gray-500">{item.category}</td>
-                      <td className="px-6 py-4 text-right">
-                        <button onClick={() => handleEdit(item)} className="text-blue-600 font-bold text-xs hover:underline">Edit Entry</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-
-        {view === 'edit' && (
-          <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in slide-in-from-bottom-4">
-            <div className="lg:col-span-2 space-y-6">
-              <div className="bg-white p-8 rounded-2xl border border-gray-200 shadow-sm space-y-6">
-                <div className="flex justify-between items-center border-b border-gray-100 pb-4">
-                  <h2 className="font-bold text-gray-900">Content Editor</h2>
-                  <button onClick={generateAIContent} disabled={isGenerating} className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg hover:bg-blue-100 disabled:opacity-50 flex items-center gap-2">
-                    {isGenerating ? 'Generating...' : '✨ Write with AI'}
-                  </button>
-                </div>
-                
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Entry ID (Unique)</label>
-                    <input className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm" value={currentEditItem.id} readOnly />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Display Title</label>
+            <div className="bg-white rounded-[32px] border border-gray-100 shadow-sm overflow-hidden">
+               <div className="p-6 border-b border-gray-50 bg-gray-50/30 flex items-center gap-4">
+                  <div className="relative flex-grow">
                     <input 
-                      className="w-full p-3 border border-gray-200 rounded-xl text-sm focus:border-blue-500 outline-none"
-                      value={activeTab === 'blog' ? currentEditItem.title : currentEditItem.name}
-                      onChange={e => activeTab === 'blog' ? setCurrentEditItem({...currentEditItem, title: e.target.value}) : setCurrentEditItem({...currentEditItem, name: e.target.value})}
+                      type="text" 
+                      placeholder="Search entries..."
+                      className="w-full pl-12 pr-6 py-3 rounded-xl border border-gray-200 outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500/30 transition-all font-medium"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
                     />
+                    <span className="absolute left-4 top-3.5 text-gray-400">🔍</span>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Description / Body</label>
-                    <textarea 
-                      className="w-full p-3 border border-gray-200 rounded-xl text-sm h-64 font-mono focus:border-blue-500 outline-none"
-                      value={activeTab === 'blog' ? currentEditItem.content : currentEditItem.shortDescription}
-                      onChange={e => activeTab === 'blog' ? setCurrentEditItem({...currentEditItem, content: e.target.value}) : setCurrentEditItem({...currentEditItem, shortDescription: e.target.value})}
-                    />
-                  </div>
-                </div>
-              </div>
+               </div>
+               <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50">
+                        <th className="px-8 py-5">Entry Details</th>
+                        <th className="px-8 py-5">Category</th>
+                        <th className="px-8 py-5 text-right">Management</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {filteredItems.map((item: any) => (
+                        <tr key={item.id} className="group hover:bg-gray-50/50 transition-colors">
+                          <td className="px-8 py-6">
+                            <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
+                                {item.icon || '📄'}
+                              </div>
+                              <div>
+                                <h4 className="font-bold text-gray-900">{item.title || item.name}</h4>
+                                <p className="text-[10px] text-gray-400 font-bold uppercase">{item.id}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-8 py-6">
+                            <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-[10px] font-black uppercase tracking-tight">
+                              {item.category}
+                            </span>
+                          </td>
+                          <td className="px-8 py-6 text-right">
+                            <button 
+                              onClick={() => handleEdit(item)}
+                              className="text-blue-600 font-bold text-sm hover:underline"
+                            >
+                              Edit Details
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+               </div>
             </div>
-
-            <aside className="space-y-6">
-              <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4">
-                <h3 className="font-bold text-gray-900">Publishing</h3>
-                <button onClick={handleSave} className="w-full bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 shadow-xl shadow-blue-500/20">Save Locally</button>
-                <button onClick={() => setView('preview')} className="w-full bg-gray-50 text-gray-900 font-bold py-3 rounded-xl hover:bg-gray-100">Live Preview</button>
-                <button onClick={() => setView('list')} className="w-full text-center text-xs text-gray-400 font-bold hover:text-gray-900">Discard Changes</button>
-              </div>
-              <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4">
-                <h3 className="font-bold text-gray-900">Settings</h3>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Category</label>
-                  <input className="w-full p-2 bg-gray-50 border border-gray-100 rounded-lg text-sm" value={currentEditItem.category} onChange={e => setCurrentEditItem({...currentEditItem, category: e.target.value})} />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Featured Asset (Emoji/URL)</label>
-                  <input className="w-full p-2 bg-gray-50 border border-gray-100 rounded-lg text-sm" value={currentEditItem.image || currentEditItem.icon} onChange={e => activeTab === 'blog' ? setCurrentEditItem({...currentEditItem, image: e.target.value}) : setCurrentEditItem({...currentEditItem, icon: e.target.value})} />
-                </div>
-              </div>
-            </aside>
           </div>
         )}
 
-        {view === 'vercel' && (
-          <div className="max-w-3xl mx-auto space-y-8 animate-in fade-in zoom-in-95">
-            <div className="bg-white p-10 rounded-[32px] border border-gray-200 shadow-xl">
-              <div className="w-16 h-16 bg-black text-white rounded-2xl flex items-center justify-center text-3xl mb-6 mx-auto">▲</div>
-              <h2 className="text-3xl font-black text-center mb-4">Deploy to Vercel</h2>
-              <p className="text-center text-gray-500 mb-10 leading-relaxed">Since your site is hosted on Vercel as a static app, you need to push your code changes to GitHub to update the production site.</p>
-              
-              <div className="space-y-6">
-                <div className="flex gap-4">
-                  <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs shrink-0">1</div>
-                  <div>
-                    <h4 className="font-bold text-gray-900">Export JSON</h4>
-                    <p className="text-sm text-gray-500">Go to the "Export JSON" tab and copy the entire code for {activeTab}.</p>
+        {view === 'edit' && (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-6xl mx-auto">
+             <header className="flex justify-between items-center mb-12">
+               <div>
+                  <button onClick={() => setView('list')} className="text-gray-400 font-bold text-xs hover:text-gray-900 mb-2 flex items-center gap-1">
+                    ← Back to Library
+                  </button>
+                  <h1 className="text-3xl font-black text-gray-900 tracking-tight">Editing Entry</h1>
+               </div>
+               <div className="flex gap-4">
+                  <button onClick={() => setView('preview')} className="px-6 py-3 bg-white border border-gray-200 rounded-xl font-bold hover:bg-gray-50 transition-all">Preview Mode</button>
+                  <button onClick={handleSaveToLocal} className="px-8 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-xl shadow-blue-500/20">Commit Changes</button>
+               </div>
+             </header>
+
+             <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+                <div className="lg:col-span-2 space-y-8">
+                  <div className="bg-white p-10 rounded-[40px] border border-gray-100 shadow-sm space-y-6">
+                    <div className="flex justify-between items-center">
+                      <h3 className="font-black text-gray-900 uppercase text-xs tracking-widest">Main Content</h3>
+                      <button 
+                        onClick={generateAIContent}
+                        disabled={isGenerating}
+                        className="bg-blue-50 text-blue-600 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-100 disabled:opacity-50 flex items-center gap-2"
+                      >
+                        {isGenerating ? 'AI is Thinking...' : '✨ Autocomplete with AI'}
+                      </button>
+                    </div>
+
+                    <div className="space-y-6">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Display Title</label>
+                        <input 
+                          className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-xl outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500/20"
+                          value={activeTab === 'blog' ? currentEditItem.title : currentEditItem.name}
+                          onChange={e => activeTab === 'blog' ? setCurrentEditItem({...currentEditItem, title: e.target.value}) : setCurrentEditItem({...currentEditItem, name: e.target.value})}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Article Body (HTML Supported)</label>
+                        <textarea 
+                          className="w-full p-6 bg-gray-50 border border-gray-100 rounded-[32px] h-[500px] font-mono text-sm leading-relaxed outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500/20"
+                          value={activeTab === 'blog' ? currentEditItem.content : currentEditItem.shortDescription}
+                          onChange={e => activeTab === 'blog' ? setCurrentEditItem({...currentEditItem, content: e.target.value}) : setCurrentEditItem({...currentEditItem, shortDescription: e.target.value})}
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div className="flex gap-4">
-                  <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs shrink-0">2</div>
-                  <div>
-                    <h4 className="font-bold text-gray-900">Update Code</h4>
-                    <p className="text-sm text-gray-500">Open your project in VS Code, find <code>constants.tsx</code>, and replace the {activeTab === 'blog' ? 'BLOG_POSTS' : 'EXTENSIONS'} array with the new data.</p>
+
+                <div className="space-y-8">
+                  <div className="bg-white p-8 rounded-[32px] border border-gray-100 shadow-sm space-y-6">
+                    <h3 className="font-black text-gray-900 uppercase text-xs tracking-widest">Meta Settings</h3>
+                    
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Category Tag</label>
+                        <input className="w-full p-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold" value={currentEditItem.category} onChange={e => setCurrentEditItem({...currentEditItem, category: e.target.value})} />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Feature Image / Icon</label>
+                        <input className="w-full p-3 bg-gray-50 border border-gray-100 rounded-xl text-sm" value={currentEditItem.image || currentEditItem.icon} onChange={e => activeTab === 'blog' ? setCurrentEditItem({...currentEditItem, image: e.target.value}) : setCurrentEditItem({...currentEditItem, icon: e.target.value})} />
+                      </div>
+                      {activeTab === 'extension' && (
+                        <>
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Store URL</label>
+                            <input className="w-full p-3 bg-gray-50 border border-gray-100 rounded-xl text-sm" value={currentEditItem.storeUrl} onChange={e => setCurrentEditItem({...currentEditItem, storeUrl: e.target.value})} />
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="bg-blue-600 p-8 rounded-[32px] text-white space-y-4 shadow-xl shadow-blue-500/20">
+                    <h4 className="font-black uppercase text-xs tracking-widest opacity-60">SEO Tip</h4>
+                    <p className="text-sm font-bold leading-relaxed">
+                      "Using Gemini to generate summaries helps in ranking higher on Google by adding semantic keywords naturally."
+                    </p>
                   </div>
                 </div>
-                <div className="flex gap-4">
-                  <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs shrink-0">3</div>
-                  <div>
-                    <h4 className="font-bold text-gray-900">Push to GitHub</h4>
-                    <p className="text-sm text-gray-500">Commit and push your changes. Vercel will detect the push and automatically redeploy your site in 30 seconds.</p>
-                  </div>
-                </div>
-              </div>
-              
-              <button onClick={() => setView('json')} className="w-full mt-12 bg-gray-900 text-white font-bold py-4 rounded-2xl hover:bg-black transition-all">Go to Export Tab</button>
-            </div>
+             </div>
           </div>
         )}
 
         {view === 'json' && (
-          <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-top-4">
-            <div className="bg-[#1B2733] p-8 rounded-[32px] shadow-2xl">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-bold text-white">Production JSON Payload</h2>
+          <div className="max-w-4xl mx-auto animate-in fade-in zoom-in-95 duration-500">
+            <div className="bg-gray-900 p-12 rounded-[48px] shadow-3xl border border-gray-800">
+              <div className="flex justify-between items-center mb-10">
+                <div>
+                  <h2 className="text-2xl font-black text-white tracking-tight">Export for Production</h2>
+                  <p className="text-gray-500 text-sm mt-1">Copy this data to your <code>constants.tsx</code> file to update the live site.</p>
+                </div>
                 <button 
                   onClick={() => {
                     navigator.clipboard.writeText(JSON.stringify(activeTab === 'blog' ? blogItems : extensionItems, null, 2));
-                    alert('Data copied! Now paste it into constants.tsx');
+                    alert('Data copied to clipboard! Update your code to deploy.');
                   }}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-blue-700"
+                  className="bg-blue-600 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-blue-700 transition-all"
                 >
-                  Copy All Content
+                  Copy Data Payload
                 </button>
               </div>
-              <pre className="text-blue-400 font-mono text-[10px] leading-relaxed h-[500px] overflow-auto custom-scrollbar">
-                {JSON.stringify(activeTab === 'blog' ? blogItems : extensionItems, null, 2)}
-              </pre>
-              <div className="mt-8 flex justify-center">
-                <button onClick={() => setView('list')} className="text-gray-400 hover:text-white font-bold text-xs">Back to entries</button>
+              <div className="bg-gray-800 rounded-[32px] p-8 border border-gray-700">
+                <pre className="text-blue-400 font-mono text-[11px] h-[500px] overflow-auto custom-scrollbar leading-relaxed">
+                  {JSON.stringify(activeTab === 'blog' ? blogItems : extensionItems, null, 2)}
+                </pre>
+              </div>
+              <div className="mt-10 text-center">
+                 <button onClick={() => setView('list')} className="text-gray-500 font-bold text-xs hover:text-white transition-colors">Return to Dashboard</button>
               </div>
             </div>
           </div>
         )}
 
-        {view === 'preview' && (
-          <div className="bg-white rounded-[40px] border border-gray-200 shadow-2xl overflow-hidden animate-in zoom-in-95">
-             <div className="bg-gray-900 p-4 flex justify-between items-center">
-                <div className="flex gap-2">
-                   <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                   <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                   <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                </div>
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Browser Sandbox Preview</span>
-                <button onClick={() => setView('edit')} className="text-white bg-white/10 px-3 py-1 rounded text-[10px] font-bold">Exit Preview</button>
-             </div>
-             <div className="p-12 overflow-y-auto max-h-[80vh]">
-                {activeTab === 'blog' ? (
-                  <BlogPostDetail post={currentEditItem} onBack={() => setView('edit')} />
-                ) : (
-                  <div className="max-w-md mx-auto text-center">
+        {view === 'help' && (
+          <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <h1 className="text-4xl font-black text-gray-900 mb-12 tracking-tight text-center">How to Deploy to Vercel</h1>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+               {[
+                 { step: "01", title: "Update constants.tsx", text: "Go to Export Data, copy the JSON, and replace the arrays in your code." },
+                 { step: "02", title: "Push to GitHub", text: "Sync your project with your GitHub repository. Vercel tracks this automatically." },
+                 { step: "03", title: "Live Updates", text: "Vercel will detect the push and rebuild your site in seconds. Pure magic." }
+               ].map((item, idx) => (
+                 <div key={idx} className="bg-white p-8 rounded-[32px] border border-gray-100 shadow-sm space-y-4">
+                   <span className="text-5xl font-black text-blue-50 opacity-20 block">{item.step}</span>
+                   <h3 className="font-black text-gray-900 text-lg">{item.title}</h3>
+                   <p className="text-gray-500 text-sm leading-relaxed font-medium">{item.text}</p>
+                 </div>
+               ))}
+            </div>
+          </div>
+        )}
+
+        {view === 'preview' && currentEditItem && (
+          <div className="bg-white rounded-[48px] shadow-3xl border border-gray-100 overflow-hidden animate-in zoom-in-95 duration-500">
+            <div className="bg-gray-900 p-4 flex justify-between items-center">
+              <div className="flex gap-2 ml-4">
+                <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                <div className="w-3 h-3 rounded-full bg-green-500"></div>
+              </div>
+              <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Sandbox Environment</span>
+              <button onClick={() => setView('edit')} className="bg-white/10 text-white px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest mr-4">Close Preview</button>
+            </div>
+            <div className="p-16 max-h-[85vh] overflow-y-auto">
+               {activeTab === 'blog' ? (
+                 <BlogPostDetail post={currentEditItem} onBack={() => setView('edit')} />
+               ) : (
+                 <div className="text-center max-w-2xl mx-auto py-20">
                     <div className="text-8xl mb-8">{currentEditItem.icon}</div>
-                    <h2 className="text-4xl font-black mb-4">{currentEditItem.name}</h2>
-                    <p className="text-gray-500 text-lg mb-8">{currentEditItem.shortDescription}</p>
-                    <button className="bg-blue-600 text-white px-8 py-4 rounded-2xl font-bold">Add to Chrome</button>
-                  </div>
-                )}
-             </div>
+                    <h2 className="text-4xl font-black text-gray-900 mb-4 tracking-tight">{currentEditItem.name}</h2>
+                    <p className="text-xl text-gray-500 mb-10 leading-relaxed font-medium">{currentEditItem.shortDescription}</p>
+                    <button className="bg-blue-600 text-white px-10 py-5 rounded-[24px] font-black shadow-2xl shadow-blue-500/30">Get Extension Now</button>
+                 </div>
+               )}
+            </div>
           </div>
         )}
       </main>
