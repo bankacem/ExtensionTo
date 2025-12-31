@@ -100,8 +100,9 @@ const AdminCMS: React.FC = () => {
     if (!currentEditItem) return;
     setStatus({ loading: true, message: 'جاري تحليل المحتوى برمجياً... 🔍' });
     try {
-      /* Initialization follows strictly named parameter with API_KEY from process.env */
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const apiKey = process.env.API_KEY;
+      if (!apiKey) throw new Error("API Key missing");
+      const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `أنت خبير SEO محترف. قم بتحليل هذا العنوان: "${currentEditItem.title}" والمحتوى: "${currentEditItem.content?.substring(0, 1000)}". أعطني 3 نصائح محددة باللغة العربية لتحسين الترتيب في جوجل.`
@@ -118,8 +119,9 @@ const AdminCMS: React.FC = () => {
     
     setStatus({ loading: true, message: 'جاري دراسة استراتيجية المحتوى... 🤖' });
     try {
-      /* Initialization follows strictly named parameter with API_KEY from process.env */
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const apiKey = process.env.API_KEY;
+      if (!apiKey) throw new Error("API Key missing");
+      const ai = new GoogleGenAI({ apiKey });
       
       setStatus({ loading: true, message: 'جاري كتابة المقال... ✍️' });
       const textRes = await ai.models.generateContent({
@@ -138,11 +140,12 @@ const AdminCMS: React.FC = () => {
         contents: data.imgPrompt || `صورة احترافية حديثة لموضوع ${data.title}`,
       });
 
-      // إصلاح الخطأ البرمجي عبر فحص وجود candidates بشكل صريح
-      if (imgResponse.candidates && imgResponse.candidates.length > 0) {
-        const firstCandidate = imgResponse.candidates[0];
-        if (firstCandidate.content && firstCandidate.content.parts) {
-          for (const part of firstCandidate.content.parts) {
+      // الحل النهائي لـ TypeScript: استخدام متغير ثابت (Constant narrowing)
+      const candidates = imgResponse.candidates;
+      if (candidates && candidates.length > 0) {
+        const parts = candidates[0].content?.parts;
+        if (parts) {
+          for (const part of parts) {
             if (part.inlineData && part.inlineData.data) {
               setGeneratedImageBase64(`data:image/png;base64,${part.inlineData.data}`);
             }
@@ -194,19 +197,15 @@ const AdminCMS: React.FC = () => {
           <button onClick={() => setView('dashboard')} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all font-bold text-sm ${view === 'dashboard' ? 'bg-blue-600 shadow-xl' : 'text-slate-400 hover:bg-white/5'}`}>
             <span>📊 الإحصائيات العامة</span>
           </button>
-          
           <button onClick={() => setView('keywords')} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all font-bold text-sm ${view === 'keywords' ? 'bg-blue-600 shadow-xl' : 'text-slate-400 hover:bg-white/5'}`}>
             <span>🔑 الكلمات المفتاحية</span>
           </button>
-
           <div className="h-px bg-white/5 my-6"></div>
-          
           <div className="px-4">
             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">إدارة المحتوى</p>
             <button onClick={() => {setActiveTab('blog'); setView('list');}} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all font-bold text-sm ${activeTab === 'blog' && view === 'list' ? 'bg-indigo-600' : 'text-slate-400 hover:bg-white/5'}`}>📄 المقالات</button>
             <button onClick={() => {setActiveTab('extension'); setView('list');}} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all font-bold text-sm ${activeTab === 'extension' && view === 'list' ? 'bg-indigo-600' : 'text-slate-400 hover:bg-white/5'}`}>🧩 الإضافات</button>
           </div>
-
           <div className="absolute bottom-10 left-8 right-8">
             <button onClick={() => setView('auto-gen')} className="w-full py-5 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-2xl font-black text-xs shadow-2xl hover:scale-105 transition-transform flex items-center justify-center gap-2">
               🪄 مولد المحتوى الذكي
@@ -243,7 +242,6 @@ const AdminCMS: React.FC = () => {
               ))}
             </div>
 
-            {/* الرسم البياني */}
             <div className="grid grid-cols-12 gap-8">
                <div className="col-span-8 bg-white p-12 rounded-[48px] border border-slate-100 shadow-sm">
                   <div className="flex justify-between items-center mb-10">
@@ -349,7 +347,6 @@ const AdminCMS: React.FC = () => {
                 <button onClick={() => setView('auto-gen')} className="bg-indigo-600 text-white px-10 py-5 rounded-[24px] font-black text-sm shadow-xl hover:scale-105 transition-all">🪄 توليد محتوى ذكي</button>
               </div>
             </header>
-
             <div className="grid grid-cols-1 gap-6">
               {(activeTab === 'blog' ? blogItems : extensionItems).map((item: any) => (
                 <div key={item.id} className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm flex items-center justify-between group hover:border-blue-200 transition-all">
@@ -387,7 +384,6 @@ const AdminCMS: React.FC = () => {
                   <button onClick={handleSave} className="px-12 py-5 bg-blue-600 text-white font-black text-sm rounded-[24px] shadow-2xl shadow-blue-100 hover:bg-blue-700 transition-all">حفظ ونشر</button>
                </div>
             </header>
-
             <div className="grid grid-cols-12 gap-12">
               <div className="col-span-8 space-y-10">
                 <div className="bg-white p-14 rounded-[56px] border border-slate-50 shadow-sm space-y-10">
@@ -401,7 +397,6 @@ const AdminCMS: React.FC = () => {
                   </div>
                 </div>
               </div>
-
               <div className="col-span-4 space-y-8">
                  <div className="bg-white p-10 rounded-[48px] border-2 border-blue-50 shadow-2xl shadow-blue-100/20 space-y-8">
                     <div className="flex justify-between items-center border-b border-slate-50 pb-6">
@@ -410,10 +405,7 @@ const AdminCMS: React.FC = () => {
                           {calculateSeoScore(currentEditItem)}
                        </div>
                     </div>
-                    <button 
-                      onClick={runSeoAudit}
-                      className="w-full py-4 bg-slate-950 text-white rounded-2xl font-black text-xs hover:bg-blue-600 transition-all flex items-center justify-center gap-2"
-                    >
+                    <button onClick={runSeoAudit} className="w-full py-4 bg-slate-950 text-white rounded-2xl font-black text-xs hover:bg-blue-600 transition-all flex items-center justify-center gap-2">
                        {status.loading ? 'جاري التحليل...' : 'تدقيق SEO'}
                     </button>
                     {seoAuditResult && (
@@ -422,7 +414,6 @@ const AdminCMS: React.FC = () => {
                       </div>
                     )}
                  </div>
-
                  <div className="bg-white p-10 rounded-[48px] border border-slate-100 shadow-sm space-y-8">
                     <h3 className="font-black text-sm text-slate-400 uppercase tracking-widest text-center">الوسائط</h3>
                     <div className="aspect-video bg-slate-50 rounded-[32px] border-2 border-dashed border-slate-200 flex flex-col items-center justify-center overflow-hidden shadow-inner">
@@ -446,28 +437,16 @@ const AdminCMS: React.FC = () => {
               <h1 className="text-6xl font-black text-slate-900 tracking-tight">محرك النمو</h1>
               <p className="text-slate-500 font-medium text-xl max-w-lg mx-auto">توليد مقالات احترافية بضغطة زر واحدة.</p>
             </div>
-
             <div className="bg-white p-14 rounded-[64px] border border-slate-100 shadow-2xl space-y-10">
               <div className="space-y-4 text-right">
                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pr-4">الكلمة المفتاحية</label>
                 <div className="flex gap-4">
-                  <input 
-                    type="text" 
-                    placeholder="مثال: أفضل إضافات كروم للخصوصية" 
-                    className="flex-grow px-10 py-8 bg-slate-50 border border-slate-100 rounded-[32px] text-2xl font-bold outline-none focus:bg-white transition-all text-right"
-                    value={seoKeyword} 
-                    onChange={e => setSeoKeyword(e.target.value)} 
-                  />
-                  <button 
-                    onClick={performFullAutoMagic} 
-                    disabled={status.loading}
-                    className="px-14 py-8 bg-slate-950 text-white font-black rounded-[32px] shadow-2xl hover:scale-105 transition-all disabled:bg-slate-200"
-                  >
+                  <input type="text" placeholder="مثال: أفضل إضافات كروم للخصوصية" className="flex-grow px-10 py-8 bg-slate-50 border border-slate-100 rounded-[32px] text-2xl font-bold outline-none focus:bg-white transition-all text-right" value={seoKeyword} onChange={e => setSeoKeyword(e.target.value)} />
+                  <button onClick={performFullAutoMagic} disabled={status.loading} className="px-14 py-8 bg-slate-950 text-white font-black rounded-[32px] shadow-2xl hover:scale-105 transition-all disabled:bg-slate-200">
                     {status.loading ? 'جاري العمل...' : 'توليد'}
                   </button>
                 </div>
               </div>
-
               {status.loading && (
                 <div className="flex flex-col items-center gap-6 py-6 animate-in fade-in">
                   <div className="w-14 h-14 border-[6px] border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
