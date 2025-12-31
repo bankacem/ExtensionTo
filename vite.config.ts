@@ -4,9 +4,13 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  define: {
+    // هذا السطر يحل مشكلة "process is not defined" في المتصفح
+    'process.env': process.env
+  },
   build: {
     outDir: 'dist',
-    sourcemap: true,
+    sourcemap: false,
   },
   server: {
     port: 3000,
