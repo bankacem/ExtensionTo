@@ -5,7 +5,7 @@ import { BLOG_POSTS as STATIC_POSTS, EXTENSIONS as STATIC_EXTENSIONS } from '../
 import { GoogleGenAI, Type } from "@google/genai";
 
 type ContentType = 'blog' | 'extension';
-type AdminView = 'list' | 'edit' | 'preview' | 'json' | 'analytics';
+type AdminView = 'dashboard' | 'list' | 'edit' | 'auto-gen' | 'json';
 
 const AdminCMS: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ContentType>('blog');
@@ -18,14 +18,13 @@ const AdminCMS: React.FC = () => {
     return saved ? JSON.parse(saved) : STATIC_EXTENSIONS;
   });
 
-  const [view, setView] = useState<AdminView>('analytics');
+  const [view, setView] = useState<AdminView>('dashboard');
   const [currentEditItem, setCurrentEditItem] = useState<any>(null);
   const [status, setStatus] = useState<{ loading: boolean; message: string }>({ loading: false, message: '' });
   const [seoKeyword, setSeoKeyword] = useState('');
   const [analyticsData, setAnalyticsData] = useState<any[]>([]);
   const [generatedImageBase64, setGeneratedImageBase64] = useState<string | null>(null);
 
-  // تحديث البيانات تلقائياً
   useEffect(() => {
     localStorage.setItem('cms_blog_posts', JSON.stringify(blogItems));
     localStorage.setItem('cms_extensions', JSON.stringify(extensionItems));
@@ -47,64 +46,62 @@ const AdminCMS: React.FC = () => {
     return { pageViews, installs, liveNow };
   }, [analyticsData]);
 
-  // العملية الآلية بالكامل (مقال + صورة)
+  // وظيفة التوليد الآلي الشامل
   const performFullAutoMagic = async () => {
-    if (!seoKeyword) return alert("من فضلك أدخل موضوع المقال أو الكلمة المفتاحية");
+    if (!seoKeyword) return alert("أدخل موضوع المقال أولاً");
     
-    setStatus({ loading: true, message: 'جاري استدعاء العقول الاصطناعية... 🧠' });
+    setStatus({ loading: true, message: 'جاري تشغيل محركات الذكاء... 🚀' });
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
       
-      // الخطوة 1: توليد المحتوى
-      setStatus({ loading: true, message: 'جاري كتابة المقال وتجهيز السيو... ✍️' });
-      const textResponse = await ai.models.generateContent({
+      // 1. توليد النص
+      setStatus({ loading: true, message: 'جاري صياغة المحتوى باحترافية... ✍️' });
+      const textRes = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: `Write a high-quality Arabic blog post about "${seoKeyword}".
-        Return JSON: { "title": "...", "content": "...", "excerpt": "...", "readTime": "...", "imgPrompt": "Detailed visual prompt for AI image generation about this topic" }.
-        Include <h2> tags. Content must be professional and catchy.`,
+        contents: `Write a high-quality, long-form Arabic blog post about "${seoKeyword}". 
+        Focus on SEO. Return JSON ONLY: { "title": "...", "content": "...", "excerpt": "...", "readTime": "...", "imgPrompt": "..." }. 
+        Use <h2> for subheadings. Content must be engaging.`,
         config: { responseMimeType: "application/json" }
       });
       
-      const data = JSON.parse(textResponse.text || "{}");
+      const data = JSON.parse(textRes.text || "{}");
       
-      // الخطوة 2: توليد الصورة بناءً على وصف المقال
-      setStatus({ loading: true, message: 'جاري تصميم صورة حصرية لمقالك... 🎨' });
-      const imgResponse = await ai.models.generateContent({
+      // 2. توليد الصورة
+      setStatus({ loading: true, message: 'جاري تصميم الصورة الحصرية... 🎨' });
+      const imgRes = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
-        contents: data.imgPrompt || `Professional technology illustration for ${data.title}`,
+        contents: data.imgPrompt || `Professional technology illustration for ${data.title}. Style: Apple Minimalist.`,
       });
 
-      let finalImg = '📄';
-      for (const part of imgResponse.candidates[0].content.parts) {
+      let finalImg = '';
+      for (const part of imgRes.candidates[0].content.parts) {
         if (part.inlineData) {
           finalImg = `data:image/png;base64,${part.inlineData.data}`;
           setGeneratedImageBase64(finalImg);
         }
       }
 
-      // دمج كل شيء في المحرر
+      // تجهيز المقال للتعديل النهائي
       setCurrentEditItem({
         id: `post-${Date.now()}`,
         title: data.title,
         content: data.content,
         excerpt: data.excerpt,
         readTime: data.readTime,
-        category: "تكنولوجيا",
-        image: '', // نتركها فارغة ليضع المستخدم رابط بلوجر
+        category: "ذكاء اصطناعي",
+        image: '', 
         date: new Date().toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' })
       });
       
-      setStatus({ loading: false, message: 'اكتملت العملية بنجاح! 🎉' });
+      setStatus({ loading: false, message: '' });
+      setView('edit'); // الانتقال فوراً للمحرر بعد التوليد
     } catch (e) {
       console.error(e);
-      setStatus({ loading: false, message: 'حدث خطأ أثناء التوليد آلياً.' });
+      setStatus({ loading: false, message: 'حدث خطأ. تأكد من إعدادات API.' });
     }
   };
 
   const handleSave = () => {
-    if (!currentEditItem.image) {
-      if (!confirm("لم تضع رابط صورة بلوجر بعد. هل تريد الحفظ بدونه؟")) return;
-    }
     const idx = blogItems.findIndex(i => i.id === currentEditItem.id);
     idx !== -1 ? (blogItems[idx] = currentEditItem) : blogItems.unshift(currentEditItem);
     setBlogItems([...blogItems]);
@@ -112,44 +109,48 @@ const AdminCMS: React.FC = () => {
   };
 
   return (
-    <div className="flex min-h-screen bg-[#F8F9FA] text-gray-900 font-sans selection:bg-blue-100">
-      {/* Sidebar */}
-      <aside className="w-80 bg-white border-r border-gray-100 flex flex-col fixed inset-y-0 z-30 shadow-sm">
-        <div className="p-10 border-b border-gray-50 flex items-center gap-4">
-          <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black shadow-xl shadow-blue-100 italic text-xl">ET</div>
-          <div>
-            <h2 className="font-black text-lg tracking-tight">ExtensionTo</h2>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Admin Control</p>
-          </div>
+    <div className="flex min-h-screen bg-[#FDFDFD] text-gray-900 font-sans selection:bg-blue-100">
+      {/* Sidebar Sidebar */}
+      <aside className="w-80 bg-gray-950 text-white flex flex-col fixed inset-y-0 z-30 shadow-2xl">
+        <div className="p-10 border-b border-gray-900 flex items-center gap-4">
+          <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black italic text-xl shadow-lg shadow-blue-600/20">ET</div>
+          <h2 className="font-black text-xl tracking-tighter">ExtensionTo</h2>
         </div>
         
-        <nav className="flex-grow p-8 space-y-3">
-          <button onClick={() => setView('analytics')} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all font-bold text-sm ${view === 'analytics' ? 'bg-blue-50 text-blue-600 shadow-sm' : 'text-gray-400 hover:bg-gray-50'}`}>📊 لوحة الإحصائيات</button>
-          <div className="h-px bg-gray-50 my-6"></div>
-          <button onClick={() => {setActiveTab('blog'); setView('list');}} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all font-bold text-sm ${activeTab === 'blog' && view === 'list' ? 'bg-blue-50 text-blue-600' : 'text-gray-400 hover:bg-gray-50'}`}>📄 إدارة المقالات</button>
-          <button onClick={() => {setActiveTab('extension'); setView('list');}} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all font-bold text-sm ${activeTab === 'extension' && view === 'list' ? 'bg-blue-50 text-blue-600' : 'text-gray-400 hover:bg-gray-50'}`}>🧩 إدارة الإضافات</button>
+        <nav className="flex-grow p-8 space-y-2">
+          <button onClick={() => setView('dashboard')} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all font-bold text-sm ${view === 'dashboard' ? 'bg-blue-600' : 'text-gray-400 hover:bg-white/5'}`}>📊 نظرة عامة</button>
+          <div className="h-px bg-white/5 my-6"></div>
+          <button onClick={() => setView('auto-gen')} className={`w-full flex items-center justify-between px-5 py-4 rounded-2xl transition-all font-bold text-sm ${view === 'auto-gen' ? 'bg-purple-600 text-white shadow-lg' : 'text-purple-400 hover:bg-purple-600/10'}`}>
+             <span>🪄 صناعة مقال بالذكاء</span>
+             <span className="text-[8px] bg-white/20 px-2 py-0.5 rounded-full uppercase">New</span>
+          </button>
+          <button onClick={() => {setActiveTab('blog'); setView('list');}} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all font-bold text-sm ${activeTab === 'blog' && view === 'list' ? 'bg-blue-600' : 'text-gray-400 hover:bg-white/5'}`}>📄 المقالات</button>
+          <button onClick={() => {setActiveTab('extension'); setView('list');}} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all font-bold text-sm ${activeTab === 'extension' && view === 'list' ? 'bg-blue-600' : 'text-gray-400 hover:bg-white/5'}`}>🧩 الإضافات</button>
           <div className="pt-20">
-            <button onClick={() => setView('json')} className="w-full flex items-center justify-center gap-2 px-5 py-4 rounded-2xl text-xs font-black text-gray-400 border border-gray-100 hover:bg-gray-50 transition-all uppercase tracking-widest">🚀 تصدير البيانات</button>
+            <button onClick={() => setView('json')} className="w-full flex items-center justify-center gap-2 px-5 py-4 rounded-2xl text-[10px] font-black text-gray-500 border border-white/10 hover:bg-white/5 transition-all uppercase tracking-widest">🚀 JSON Export</button>
           </div>
         </nav>
       </aside>
 
-      {/* Main Content */}
-      <main className="flex-grow ml-80 p-16 overflow-y-auto bg-[#F8F9FA]">
-        {view === 'analytics' && (
-          <div className="max-w-5xl space-y-12 animate-in fade-in duration-700">
-            <header>
-              <h1 className="text-5xl font-black text-gray-900 tracking-tight mb-2">مرحباً بك، أيها المدير</h1>
-              <p className="text-gray-500 font-medium text-lg">إليك ملخص أداء موقعك في آخر 24 ساعة.</p>
+      {/* Main Main */}
+      <main className="flex-grow ml-80 p-16 overflow-y-auto">
+        {view === 'dashboard' && (
+          <div className="max-w-5xl space-y-12 animate-in fade-in duration-500 text-right" dir="rtl">
+            <header className="flex justify-between items-end">
+              <div>
+                <h1 className="text-5xl font-black text-gray-900 tracking-tight mb-3">أهلاً بك في الإدارة السريعة</h1>
+                <p className="text-gray-400 text-lg font-medium">كل ما تحتاجه لإدارة محتواك بذكاء في مكان واحد.</p>
+              </div>
+              <button onClick={() => setView('auto-gen')} className="px-10 py-5 bg-purple-600 text-white font-black rounded-3xl shadow-2xl shadow-purple-100 hover:scale-[1.02] transition-transform">اصنع مقالاً الآن ✨</button>
             </header>
             
             <div className="grid grid-cols-3 gap-8">
               {[
-                { label: 'المشاهدات', value: realStats.pageViews, color: 'text-gray-900' },
-                { label: 'التحميلات', value: realStats.installs, color: 'text-blue-600' },
-                { label: 'نشط حالياً', value: realStats.liveNow, color: 'text-red-500 animate-pulse' }
+                { label: 'إجمالي المشاهدات', value: realStats.pageViews, color: 'text-gray-900' },
+                { label: 'تحميلات الإضافات', value: realStats.installs, color: 'text-blue-600' },
+                { label: 'نشط الآن', value: realStats.liveNow, color: 'text-red-500 animate-pulse' }
               ].map((stat, i) => (
-                <div key={i} className="bg-white p-10 rounded-[40px] border border-gray-100 shadow-sm apple-shadow">
+                <div key={i} className="bg-white p-10 rounded-[40px] border border-gray-100 shadow-sm">
                   <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-3">{stat.label}</p>
                   <span className={`text-5xl font-black ${stat.color}`}>{stat.value}</span>
                 </div>
@@ -158,15 +159,69 @@ const AdminCMS: React.FC = () => {
           </div>
         )}
 
+        {view === 'auto-gen' && (
+          <div className="max-w-4xl mx-auto space-y-12 animate-in slide-in-from-bottom-8 duration-700 text-right" dir="rtl">
+            <div className="text-center space-y-4">
+              <div className="w-20 h-20 bg-purple-100 text-purple-600 rounded-[32px] flex items-center justify-center text-4xl mx-auto shadow-inner">🪄</div>
+              <h1 className="text-5xl font-black text-gray-900">صانع المقالات الآلي</h1>
+              <p className="text-gray-500 font-medium text-lg">أدخل الكلمة المفتاحية، وسيقوم Gemini بكتابة المقال وتصميم الصورة وتجهيز كل شيء.</p>
+            </div>
+
+            <div className="bg-white p-12 rounded-[56px] border border-gray-50 shadow-2xl shadow-purple-100/50 space-y-10">
+              <div className="space-y-4">
+                <label className="text-sm font-black text-gray-400 uppercase tracking-widest pr-4">ما هو موضوع المقال؟</label>
+                <div className="flex gap-4">
+                  <input 
+                    type="text" 
+                    placeholder="مثال: كيف تحمي خصوصيتك على متصفح كروم في 2024" 
+                    className="flex-grow px-10 py-7 bg-gray-50 border border-gray-100 rounded-[32px] text-xl font-bold outline-none focus:bg-white focus:ring-8 focus:ring-purple-50 transition-all"
+                    value={seoKeyword} 
+                    onChange={e => setSeoKeyword(e.target.value)} 
+                    onKeyPress={(e) => e.key === 'Enter' && performFullAutoMagic()}
+                  />
+                  <button 
+                    onClick={performFullAutoMagic} 
+                    disabled={status.loading}
+                    className="px-14 py-7 bg-purple-600 text-white font-black rounded-[32px] shadow-xl hover:scale-105 active:scale-95 transition-all disabled:bg-gray-200"
+                  >
+                    {status.loading ? 'جاري السحر...' : 'أطلق السحر!'}
+                  </button>
+                </div>
+              </div>
+
+              {status.loading && (
+                <div className="flex flex-col items-center gap-4 py-8 animate-in fade-in">
+                  <div className="w-12 h-12 border-4 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
+                  <p className="font-black text-purple-600 animate-pulse">{status.message}</p>
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-8 opacity-50">
+               <div className="p-8 bg-gray-50 rounded-[40px] border border-gray-100 flex items-center gap-6">
+                  <div className="text-3xl">✍️</div>
+                  <p className="text-xs font-bold text-gray-500">كتابة محتوى طويل وحصري متوافق مع معايير SEO.</p>
+               </div>
+               <div className="p-8 bg-gray-50 rounded-[40px] border border-gray-100 flex items-center gap-6">
+                  <div className="text-3xl">🎨</div>
+                  <p className="text-xs font-bold text-gray-500">تصميم صورة فريدة 1024x1024 لكل مقال.</p>
+               </div>
+            </div>
+          </div>
+        )}
+
         {view === 'list' && (
           <div className="max-w-6xl animate-in fade-in duration-500 text-right" dir="rtl">
             <header className="flex justify-between items-center mb-16">
-              <h1 className="text-5xl font-black text-gray-900 tracking-tight">{activeTab === 'blog' ? 'المقالات المنشورة' : 'كتالوج الإضافات'}</h1>
-              <button onClick={() => {
-                const id = `${activeTab === 'blog' ? 'post' : 'ext'}-${Date.now()}`;
-                setCurrentEditItem(activeTab === 'blog' ? { id, title: '', content: '', category: 'تكنولوجيا', excerpt: '', date: 'اليوم', readTime: '5 min', image: '' } : { id, name: '', shortDescription: '', category: 'Utility', rating: 5, users: '0', icon: '✨', features: [], version: '1.0', lastUpdated: 'الآن', size: '1MB', storeUrl: '' });
-                setView('edit');
-              }} className="bg-gray-900 text-white px-10 py-5 rounded-[24px] font-black text-sm shadow-2xl hover:bg-black transition-all">+ إضافة جديد</button>
+              <h1 className="text-5xl font-black text-gray-900 tracking-tight">{activeTab === 'blog' ? 'أرشيف المقالات' : 'كتالوج الإضافات'}</h1>
+              <div className="flex gap-4">
+                <button onClick={() => setView('auto-gen')} className="bg-purple-600 text-white px-8 py-5 rounded-[24px] font-black text-sm shadow-xl hover:bg-purple-700 transition-all">🪄 توليد آلي</button>
+                <button onClick={() => {
+                  const id = `${activeTab === 'blog' ? 'post' : 'ext'}-${Date.now()}`;
+                  setCurrentEditItem(activeTab === 'blog' ? { id, title: '', content: '', category: 'تكنولوجيا', excerpt: '', date: 'اليوم', readTime: '5 min', image: '' } : { id, name: '', shortDescription: '', category: 'Utility', rating: 5, users: '0', icon: '✨', features: [], version: '1.0', lastUpdated: 'الآن', size: '1MB', storeUrl: '' });
+                  setView('edit');
+                }} className="bg-gray-900 text-white px-8 py-5 rounded-[24px] font-black text-sm shadow-xl hover:bg-black transition-all">+ إضافة يدوي</button>
+              </div>
             </header>
 
             <div className="bg-white rounded-[48px] border border-gray-50 shadow-sm overflow-hidden apple-shadow">
@@ -175,14 +230,16 @@ const AdminCMS: React.FC = () => {
                   {(activeTab === 'blog' ? blogItems : extensionItems).map((item: any) => (
                     <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
                       <td className="px-12 py-8 flex items-center gap-6">
-                        <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center text-3xl shrink-0">{item.icon || (item.image ? <img src={item.image} className="w-full h-full object-cover rounded-2xl" /> : '📄')}</div>
+                        <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center text-4xl shrink-0 overflow-hidden">
+                          {item.image ? <img src={item.image} className="w-full h-full object-cover" /> : item.icon || '📄'}
+                        </div>
                         <div>
-                          <span className="font-black text-xl text-gray-900 block mb-1">{item.title || item.name}</span>
-                          <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{item.category}</span>
+                          <span className="font-black text-2xl text-gray-900 block mb-1">{item.title || item.name}</span>
+                          <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{item.category} • {item.date}</span>
                         </div>
                       </td>
                       <td className="px-12 py-8 text-left">
-                        <button onClick={() => { setCurrentEditItem({...item}); setView('edit'); }} className="text-blue-600 font-black text-sm hover:underline">تعديل المحتوى</button>
+                        <button onClick={() => { setCurrentEditItem({...item}); setView('edit'); }} className="text-blue-600 font-black text-sm hover:underline">تحرير</button>
                       </td>
                     </tr>
                   ))}
@@ -193,87 +250,59 @@ const AdminCMS: React.FC = () => {
         )}
 
         {view === 'edit' && currentEditItem && (
-          <div className="max-w-6xl mx-auto animate-in fade-in duration-500 text-right" dir="rtl">
+          <div className="max-w-7xl mx-auto animate-in fade-in duration-500 text-right" dir="rtl">
             <header className="flex justify-between items-center mb-12">
                <div>
-                  <h1 className="text-4xl font-black text-gray-900 mb-2">المحرر الذكي 2.0</h1>
-                  <p className="text-gray-400 font-medium">نظام التوليد الآلي المدعوم بـ Gemini</p>
+                  <h1 className="text-4xl font-black text-gray-900 mb-2">تجهيز المقال للنشر</h1>
+                  <p className="text-gray-400 font-medium">راجع المحتوى، ارفع الصورة لبلوجر، ثم اضغط حفظ.</p>
                </div>
                <div className="flex gap-4">
                   <button onClick={() => setView('list')} className="px-8 py-4 bg-white border border-gray-100 font-black text-sm rounded-2xl hover:bg-gray-50">إلغاء</button>
-                  <button onClick={handleSave} className="px-10 py-4 bg-blue-600 text-white font-black text-sm rounded-2xl shadow-xl shadow-blue-100 hover:bg-blue-700">حفظ ونشر المقال</button>
+                  <button onClick={handleSave} className="px-10 py-4 bg-blue-600 text-white font-black text-sm rounded-2xl shadow-xl shadow-blue-100 hover:bg-blue-700">حفظ ونشر</button>
                </div>
             </header>
 
-            {/* نظام التوليد الآلي بضغطة زر */}
-            {activeTab === 'blog' && (
-              <div className="mb-12 p-12 bg-white rounded-[48px] border border-gray-50 shadow-sm apple-shadow space-y-8">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-2xl font-black text-gray-900 flex items-center gap-3">توليد مقال كامل بضغطة واحدة 🪄</h2>
-                  {status.loading && (
-                    <div className="flex items-center gap-3 text-blue-600 font-bold animate-pulse">
-                      <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                      {status.message}
-                    </div>
-                  )}
-                </div>
-                
-                <div className="flex gap-4">
-                  <input 
-                    type="text" 
-                    placeholder="ماذا تريد أن تكتب اليوم؟ (مثال: أمان كلمات المرور في 2024)" 
-                    className="flex-grow px-8 py-5 bg-gray-50 border border-gray-100 rounded-[24px] text-lg font-bold outline-none focus:bg-white focus:ring-4 focus:ring-blue-50 transition-all"
-                    value={seoKeyword} 
-                    onChange={e => setSeoKeyword(e.target.value)} 
-                  />
-                  <button 
-                    onClick={performFullAutoMagic} 
-                    disabled={status.loading}
-                    className="px-12 py-5 bg-blue-600 text-white font-black rounded-[24px] shadow-2xl shadow-blue-100 hover:scale-[1.02] transition-transform active:scale-95 disabled:bg-gray-200"
-                  >
-                    أطلق السحر! ✨
-                  </button>
-                </div>
-              </div>
-            )}
-
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-12">
               <div className="lg:col-span-3 space-y-10">
-                <div className="bg-white p-12 rounded-[48px] border border-gray-50 shadow-sm apple-shadow space-y-8">
+                <div className="bg-white p-12 rounded-[56px] border border-gray-50 shadow-sm apple-shadow space-y-8">
                   <div className="space-y-3">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block pr-2">عنوان المقال</label>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block pr-2">العنوان النهائي</label>
                     <input className="w-full p-8 bg-gray-50 border border-gray-100 rounded-[32px] font-black text-3xl outline-none focus:border-blue-500" value={currentEditItem.title} onChange={e => setCurrentEditItem({...currentEditItem, title: e.target.value})} />
                   </div>
                   <div className="space-y-3">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block pr-2">المحتوى الذكي (HTML)</label>
-                    <textarea className="w-full p-10 bg-gray-50 border border-gray-100 rounded-[40px] h-[600px] font-mono text-sm leading-relaxed outline-none focus:border-blue-500" value={currentEditItem.content} onChange={e => setCurrentEditItem({...currentEditItem, content: e.target.value})} />
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block pr-2">محتوى المقال (HTML)</label>
+                    <textarea className="w-full p-10 bg-gray-50 border border-gray-100 rounded-[40px] h-[700px] font-mono text-sm leading-relaxed outline-none focus:border-blue-500" value={currentEditItem.content} onChange={e => setCurrentEditItem({...currentEditItem, content: e.target.value})} />
                   </div>
                 </div>
               </div>
 
               <div className="lg:col-span-1 space-y-8">
-                 {/* قسم الربط مع بلوجر */}
-                 <div className="bg-white p-8 rounded-[40px] border border-gray-100 shadow-sm apple-shadow space-y-6">
-                    <h3 className="font-black text-sm text-gray-400 uppercase tracking-widest border-b border-gray-50 pb-4">رابط بلوجر (Host)</h3>
+                 {/* قسم بلوجر المطور */}
+                 <div className="bg-white p-8 rounded-[48px] border-2 border-purple-100 shadow-2xl shadow-purple-50 space-y-6">
+                    <div className="flex items-center gap-2 mb-2">
+                       <span className="w-3 h-3 bg-purple-600 rounded-full"></span>
+                       <h3 className="font-black text-sm text-gray-900 uppercase tracking-widest">مساعد بلوجر</h3>
+                    </div>
                     
-                    <div className="space-y-4">
-                      <div className="aspect-square bg-gray-50 rounded-[32px] border border-dashed border-gray-200 flex flex-col items-center justify-center overflow-hidden p-2">
+                    <div className="space-y-6">
+                      <div className="aspect-square bg-gray-50 rounded-[40px] border-2 border-dashed border-purple-200 flex flex-col items-center justify-center overflow-hidden relative group">
                         {currentEditItem.image ? (
-                          <img src={currentEditItem.image} className="w-full h-full object-cover rounded-[28px]" />
+                          <img src={currentEditItem.image} className="w-full h-full object-cover rounded-[38px]" />
                         ) : generatedImageBase64 ? (
-                          <div className="text-center p-4">
-                            <img src={generatedImageBase64} className="w-full h-32 object-cover rounded-xl mb-3 shadow-md" />
-                            <p className="text-[10px] text-blue-600 font-bold leading-tight">صورة حصرية جاهزة! ارفعها لبلوجر وضع الرابط أدناه.</p>
+                          <div className="text-center p-6 space-y-4">
+                            <img src={generatedImageBase64} className="w-full h-40 object-cover rounded-2xl shadow-xl" />
+                            <p className="text-[10px] text-purple-700 font-black leading-tight">هذه الصورة حصرية لك!</p>
+                            <a href={generatedImageBase64} download="blog-image.png" className="inline-block px-4 py-2 bg-purple-600 text-white text-[10px] font-bold rounded-full">تحميل الصورة</a>
                           </div>
                         ) : (
                           <span className="text-6xl grayscale opacity-20">🖼️</span>
                         )}
                       </div>
                       
-                      <div>
-                        <label className="text-[10px] font-black text-gray-400 block mb-2 mr-2">رابط الصورة من بلوجر:</label>
+                      <div className="p-6 bg-purple-50 rounded-3xl space-y-2 border border-purple-100">
+                        <p className="text-[10px] font-bold text-purple-800 leading-relaxed"><strong>الخطوة الأخيرة:</strong> ارفع الصورة التي في الأعلى إلى حسابك في "بلوجر"، ثم الصق رابط الصورة الناتج هنا:</p>
                         <input 
-                          className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-mono text-[9px] text-blue-600" 
+                          className="w-full p-4 bg-white border border-purple-200 rounded-2xl font-mono text-[9px] text-blue-600 placeholder:text-gray-300" 
                           placeholder="https://1.bp.blogspot.com/..." 
                           value={currentEditItem.image} 
                           onChange={e => setCurrentEditItem({...currentEditItem, image: e.target.value})} 
@@ -282,8 +311,8 @@ const AdminCMS: React.FC = () => {
                     </div>
                  </div>
 
-                 <div className="bg-white p-8 rounded-[40px] border border-gray-100 shadow-sm apple-shadow space-y-6">
-                    <h3 className="font-black text-sm text-gray-400 uppercase tracking-widest border-b border-gray-50 pb-4">الإعدادات</h3>
+                 <div className="bg-white p-8 rounded-[48px] border border-gray-50 shadow-sm space-y-6">
+                    <h3 className="font-black text-sm text-gray-400 uppercase tracking-widest border-b border-gray-50 pb-4">معلومات النشر</h3>
                     <div className="space-y-4">
                       <div>
                         <label className="text-[10px] font-black text-gray-400 block mb-1 mr-2">التصنيف</label>
@@ -297,15 +326,6 @@ const AdminCMS: React.FC = () => {
                  </div>
               </div>
             </div>
-          </div>
-        )}
-
-        {view === 'json' && (
-          <div className="max-w-4xl mx-auto bg-gray-900 rounded-[56px] p-16 text-white animate-in zoom-in-95 duration-500 shadow-2xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-8 opacity-10 font-black text-9xl">JSON</div>
-            <h2 className="text-3xl font-black mb-10 flex items-center gap-4">تصدير المحتوى <span className="text-xs bg-green-500 px-3 py-1 rounded-full">جاهز للإنتاج</span></h2>
-            <pre className="bg-black/50 p-10 rounded-[32px] h-[500px] overflow-auto font-mono text-[11px] text-blue-400 border border-white/5 scrollbar-hide">{JSON.stringify({ blogItems, extensionItems }, null, 2)}</pre>
-            <button onClick={() => setView('analytics')} className="mt-10 text-gray-500 font-black hover:text-white transition-colors">← العودة للوحة الإحصائيات</button>
           </div>
         )}
       </main>
