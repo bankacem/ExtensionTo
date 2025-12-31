@@ -100,8 +100,7 @@ const AdminCMS: React.FC = () => {
     if (!currentEditItem) return;
     setStatus({ loading: true, message: 'جاري تحليل المحتوى برمجياً... 🔍' });
     try {
-      const apiKey = process.env.API_KEY;
-      if (!apiKey) throw new Error("API Key missing");
+      const apiKey = process.env.API_KEY || "";
       const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
@@ -119,8 +118,7 @@ const AdminCMS: React.FC = () => {
     
     setStatus({ loading: true, message: 'جاري دراسة استراتيجية المحتوى... 🤖' });
     try {
-      const apiKey = process.env.API_KEY;
-      if (!apiKey) throw new Error("API Key missing");
+      const apiKey = process.env.API_KEY || "";
       const ai = new GoogleGenAI({ apiKey });
       
       setStatus({ loading: true, message: 'جاري كتابة المقال... ✍️' });
@@ -140,25 +138,24 @@ const AdminCMS: React.FC = () => {
         contents: data.imgPrompt || `صورة احترافية حديثة لموضوع ${data.title}`,
       });
 
-      // الحل النهائي لـ TypeScript: فحص وجود candidates بشكل صريح وآمن
-      const candidates = imgResponse?.candidates;
-      if (candidates && candidates.length > 0) {
-        const parts = candidates[0].content?.parts;
-        if (parts && parts.length > 0) {
-          for (const part of parts) {
-            if (part.inlineData && part.inlineData.data) {
-              setGeneratedImageBase64(`data:image/png;base64,${part.inlineData.data}`);
-            }
+      // استخدام Optional Chaining وفحص صارم للمصفوفات
+      const firstCandidate = imgResponse?.candidates?.[0];
+      const parts = firstCandidate?.content?.parts;
+      
+      if (parts && parts.length > 0) {
+        for (const part of parts) {
+          if (part.inlineData?.data) {
+            setGeneratedImageBase64(`data:image/png;base64,${part.inlineData.data}`);
           }
         }
       }
 
       setCurrentEditItem({
         id: `post-${Date.now()}`,
-        title: data.title,
-        content: data.content,
-        excerpt: data.excerpt,
-        readTime: data.readTime,
+        title: data.title || "عنوان جديد",
+        content: data.content || "",
+        excerpt: data.excerpt || "",
+        readTime: data.readTime || "5 min",
         category: "تحليل تقني",
         image: '', 
         date: new Date().toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' })

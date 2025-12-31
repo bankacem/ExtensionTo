@@ -24,22 +24,19 @@ const BatchStudio: React.FC = () => {
   
   const activeItem = batch.find(i => i.id === activeId);
 
+  // Fix: Explicitly cast inlineData to any to avoid conflict with global Blob type in current environment
   const analyzeImage = async (id: string, base64: string) => {
     try {
-      const apiKey = process.env.API_KEY;
-      if (!apiKey) throw new Error("Missing API Key");
-      // Use new GoogleGenAI instance for each request
+      const apiKey = process.env.API_KEY || "";
       const ai = new GoogleGenAI({ apiKey });
       
-      // Clean up base64 string to ensure it is valid raw data for the Blob part
       const base64Data = base64.includes(',') ? base64.split(',')[1] : base64;
 
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: {
           parts: [
-            // Ensure data is always a string to match the Blob interface requirements
-            { inlineData: { mimeType: 'image/png', data: base64Data || '' } },
+            { inlineData: { mimeType: 'image/png', data: base64Data || '' } as any },
             { text: "Analyze this browser extension screenshot. Identify the primary UI element. Return JSON: { \"focalPoint\": { \"x\": 0-100, \"y\": 0-100 }, \"description\": \"...\" }" }
           ]
         },
@@ -63,7 +60,6 @@ const BatchStudio: React.FC = () => {
         }
       });
 
-      // Use .text property as per SDK guidelines
       const textOutput = response.text;
       if (!textOutput) throw new Error("No text response from AI");
       const data = JSON.parse(textOutput);
