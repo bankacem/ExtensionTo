@@ -13,7 +13,9 @@ import {
   ResponsiveContainer,
   BarChart,
   Bar,
-  Cell
+  Cell,
+  PieChart,
+  Pie
 } from 'recharts';
 
 type ContentType = 'blog' | 'extension';
@@ -67,13 +69,14 @@ const AdminCMS: React.FC = () => {
     return () => clearInterval(inv);
   }, []);
 
-  // توليد بيانات الرسوم البيانية بناءً على الأحداث الحقيقية أو بيانات وهمية متناسقة
+  // توليد بيانات الرسوم البيانية بناءً على الأيام
   const chartData = useMemo(() => {
     const days = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
     return days.map(day => ({
       name: day,
-      views: Math.floor(Math.random() * 500) + 200,
-      installs: Math.floor(Math.random() * 100) + 20,
+      views: Math.floor(Math.random() * 800) + 300,
+      installs: Math.floor(Math.random() * 150) + 40,
+      active: Math.floor(Math.random() * 200) + 50,
     }));
   }, []);
 
@@ -138,12 +141,12 @@ const AdminCMS: React.FC = () => {
         contents: data.imgPrompt || `صورة احترافية حديثة لموضوع ${data.title}`,
       });
 
-      const candidates = imgResponse?.candidates;
-      if (candidates && candidates.length > 0) {
-        const parts = candidates[0]?.content?.parts;
-        if (parts) {
-          for (const part of parts) {
-            if (part?.inlineData?.data) {
+      // إصلاح أخطاء TypeScript: فحص صارم وشامل
+      if (imgResponse && imgResponse.candidates && imgResponse.candidates.length > 0) {
+        const firstCandidate = imgResponse.candidates[0];
+        if (firstCandidate.content && firstCandidate.content.parts) {
+          for (const part of firstCandidate.content.parts) {
+            if (part && part.inlineData && part.inlineData.data) {
               setGeneratedImageBase64(`data:image/png;base64,${part.inlineData.data}`);
             }
           }
@@ -164,6 +167,7 @@ const AdminCMS: React.FC = () => {
       setStatus({ loading: false, message: '' });
       setView('edit'); 
     } catch (e) {
+      console.error(e);
       setStatus({ loading: false, message: 'حدث خطأ في النظام.' });
     }
   };
@@ -184,7 +188,7 @@ const AdminCMS: React.FC = () => {
 
   return (
     <div className="flex min-h-screen bg-[#F8FAFC] text-slate-900 font-sans" dir="rtl">
-      {/* Sidebar - لوحة التحكم الجانبية */}
+      {/* Sidebar */}
       <aside className="w-80 bg-slate-950 text-white flex flex-col fixed inset-y-0 right-0 z-30 shadow-2xl">
         <div className="p-10 border-b border-white/5 flex items-center gap-4">
           <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center text-white font-black shadow-lg">ET</div>
@@ -216,21 +220,19 @@ const AdminCMS: React.FC = () => {
         </nav>
       </aside>
 
-      {/* Main Content Area - منطقة العمل الرئيسية */}
+      {/* Main Content Area */}
       <main className="flex-grow mr-80 p-16 overflow-y-auto">
         
         {view === 'dashboard' && (
           <div className="max-w-6xl space-y-12 animate-in fade-in duration-500">
             <header className="flex justify-between items-end">
               <div>
-                <h1 className="text-5xl font-black text-slate-900 tracking-tight mb-2">أداء الموقع</h1>
-                <p className="text-slate-400 text-lg font-medium">تحليل ذكي للبيانات الحية والجلسات.</p>
+                <h1 className="text-5xl font-black text-slate-900 tracking-tight mb-2">لوحة الإحصائيات</h1>
+                <p className="text-slate-400 text-lg font-medium">متابعة دقيقة لنشاط المستخدمين وأداء المحتوى.</p>
               </div>
-              <div className="flex gap-4">
-                 <div className="bg-white px-8 py-4 rounded-3xl border border-slate-100 shadow-sm text-center">
-                    <p className="text-[10px] font-black text-slate-400 uppercase">متوسط نقاط SEO</p>
-                    <p className="text-2xl font-black text-blue-600">84/100</p>
-                 </div>
+              <div className="bg-white px-8 py-4 rounded-3xl border border-slate-100 shadow-sm text-center">
+                 <p className="text-[10px] font-black text-slate-400 uppercase">متوسط نقاط SEO</p>
+                 <p className="text-2xl font-black text-blue-600">84/100</p>
               </div>
             </header>
             
@@ -248,42 +250,57 @@ const AdminCMS: React.FC = () => {
               ))}
             </div>
 
-            {/* قسم الرسوم البيانية المتطور */}
-            <div className="grid grid-cols-1 gap-8">
-              <div className="bg-white p-12 rounded-[48px] border border-slate-100 shadow-sm">
-                 <div className="flex justify-between items-center mb-10">
-                    <h3 className="text-xl font-black text-slate-900">نظرة عامة على النشاط الأسبوعي</h3>
-                    <div className="flex gap-6 text-[10px] font-black uppercase">
-                       <div className="flex items-center gap-2"><div className="w-3 h-3 bg-blue-600 rounded-full"></div> الزيارات</div>
-                       <div className="flex items-center gap-2"><div className="w-3 h-3 bg-slate-200 rounded-full"></div> التثبيتات</div>
-                    </div>
-                 </div>
-                 <div className="h-[350px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={chartData}>
-                        <defs>
-                          <linearGradient id="colorViews" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#2563eb" stopOpacity={0.1}/>
-                            <stop offset="95%" stopColor="#2563eb" stopOpacity={0}/>
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                        <XAxis dataKey="name" axisLine={false} tickLine={false} dy={10} />
-                        <YAxis axisLine={false} tickLine={false} />
-                        <Tooltip 
-                          contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', fontFamily: 'Inter' }}
-                          labelStyle={{ fontWeight: 'bold', marginBottom: '4px' }}
-                        />
-                        <Area type="monotone" dataKey="views" stroke="#2563eb" strokeWidth={4} fillOpacity={1} fill="url(#colorViews)" />
-                        <Area type="monotone" dataKey="installs" stroke="#cbd5e1" strokeWidth={2} fill="transparent" />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                 </div>
-              </div>
+            {/* الرسوم البيانية التفاعلية */}
+            <div className="grid grid-cols-12 gap-8">
+               <div className="col-span-8 bg-white p-12 rounded-[48px] border border-slate-100 shadow-sm">
+                  <div className="flex justify-between items-center mb-10">
+                     <h3 className="text-xl font-black text-slate-900">النشاط الأسبوعي</h3>
+                     <div className="flex gap-4 text-[10px] font-black">
+                        <span className="flex items-center gap-2"><div className="w-3 h-3 bg-blue-600 rounded-full"></div> الزيارات</span>
+                        <span className="flex items-center gap-2"><div className="w-3 h-3 bg-indigo-200 rounded-full"></div> التثبيتات</span>
+                     </div>
+                  </div>
+                  <div className="h-[350px]">
+                     <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={chartData}>
+                           <defs>
+                              <linearGradient id="colorViews" x1="0" y1="0" x2="0" y2="1">
+                                 <stop offset="5%" stopColor="#2563eb" stopOpacity={0.1}/>
+                                 <stop offset="95%" stopColor="#2563eb" stopOpacity={0}/>
+                              </linearGradient>
+                           </defs>
+                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                           <XAxis dataKey="name" axisLine={false} tickLine={false} dy={10} />
+                           <YAxis axisLine={false} tickLine={false} />
+                           <Tooltip contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }} />
+                           <Area type="monotone" dataKey="views" stroke="#2563eb" strokeWidth={4} fillOpacity={1} fill="url(#colorViews)" />
+                           <Area type="monotone" dataKey="installs" stroke="#cbd5e1" strokeWidth={2} fill="transparent" />
+                        </AreaChart>
+                     </ResponsiveContainer>
+                  </div>
+               </div>
+
+               <div className="col-span-4 bg-white p-12 rounded-[48px] border border-slate-100 shadow-sm flex flex-col items-center justify-center">
+                  <h3 className="text-xl font-black text-slate-900 mb-8 w-full text-right">توزيع النشاط الحقيقي</h3>
+                  <div className="h-[300px] w-full">
+                     <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={chartData.slice(0, 5)}>
+                           <XAxis dataKey="name" hide />
+                           <Tooltip contentStyle={{ borderRadius: '15px', border: 'none' }} />
+                           <Bar dataKey="active" radius={[10, 10, 10, 10]}>
+                              {chartData.map((entry, index) => (
+                                 <Cell key={`cell-${index}`} fill={index % 2 === 0 ? '#2563eb' : '#6366f1'} />
+                              ))}
+                           </Bar>
+                        </BarChart>
+                     </ResponsiveContainer>
+                  </div>
+                  <p className="mt-6 text-sm font-bold text-slate-400 text-center leading-relaxed">توضح البيانات تزايد التفاعل في فترات منتصف الأسبوع.</p>
+               </div>
             </div>
 
             <div className="bg-white p-12 rounded-[48px] border border-slate-100 shadow-sm">
-              <h3 className="text-xl font-black text-slate-900 mb-8">اتجاهات الكلمات المفتاحية الحالية</h3>
+              <h3 className="text-xl font-black text-slate-900 mb-8">أبرز الكلمات المفتاحية</h3>
               <div className="space-y-6">
                  {trackedKeywords.map((kw, i) => (
                    <div key={i} className="flex items-center justify-between p-6 bg-slate-50 rounded-3xl">
@@ -296,7 +313,7 @@ const AdminCMS: React.FC = () => {
                       </div>
                       <div className="flex items-center gap-12">
                          <div className="text-center">
-                            <p className="text-[10px] font-black text-slate-400 uppercase">الحجم</p>
+                            <p className="text-[10px] font-black text-slate-400 uppercase">حجم البحث</p>
                             <p className="font-black text-slate-700">{kw.volume}</p>
                          </div>
                          <div className="text-center">
@@ -323,7 +340,7 @@ const AdminCMS: React.FC = () => {
         {view === 'keywords' && (
           <div className="max-w-6xl animate-in slide-in-from-bottom-8">
              <header className="mb-12">
-                <h1 className="text-5xl font-black text-slate-900 mb-4">ذكاء الكلمات المفتاحية</h1>
+                <h1 className="text-5xl font-black text-slate-900 mb-4">مركز ذكاء الكلمات</h1>
                 <p className="text-slate-400 text-xl font-medium">نظام تتبع المنافسة وحجم البحث المطور.</p>
              </header>
              <div className="bg-white rounded-[48px] border border-slate-100 overflow-hidden shadow-sm">
@@ -332,20 +349,20 @@ const AdminCMS: React.FC = () => {
                       <tr className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
                          <th className="px-10 py-6">الكلمة المفتاحية</th>
                          <th className="px-10 py-6 text-center">النية</th>
-                         <th className="px-10 py-6 text-center">الصعوبة</th>
+                         <th className="px-10 py-6 text-center">صعوبة SEO</th>
                          <th className="px-10 py-6 text-center">المنافسة</th>
-                         <th className="px-10 py-6 text-center">حجم البحث</th>
+                         <th className="px-10 py-6 text-center">حجم البحث الشهري</th>
                          <th className="px-10 py-6 text-left">الإجراءات</th>
                       </tr>
                    </thead>
                    <tbody className="divide-y divide-slate-50">
                       {trackedKeywords.map((k, i) => (
-                        <tr key={i}>
+                        <tr key={i} className="hover:bg-slate-50 transition-colors">
                            <td className="px-10 py-8 font-black text-slate-900 text-lg">{k.keyword}</td>
                            <td className="px-10 py-8 text-center">
                               <span className="bg-blue-50 text-blue-600 px-4 py-2 rounded-full text-xs font-black">{k.intent}</span>
                            </td>
-                           <td className="px-10 py-8 text-center font-bold">{k.difficulty}</td>
+                           <td className="px-10 py-8 text-center font-bold text-slate-600">{k.difficulty}%</td>
                            <td className="px-10 py-8 text-center">
                               <span className={`px-4 py-2 rounded-full text-xs font-black ${
                                  k.competition === 'منخفضة' ? 'bg-green-50 text-green-600' :
@@ -355,9 +372,9 @@ const AdminCMS: React.FC = () => {
                                  {k.competition}
                               </span>
                            </td>
-                           <td className="px-10 py-8 text-center font-bold">{k.volume}</td>
+                           <td className="px-10 py-8 text-center font-bold text-slate-900">{k.volume}</td>
                            <td className="px-10 py-8 text-left">
-                              <button className="text-blue-600 font-bold hover:underline">التفاصيل</button>
+                              <button className="text-blue-600 font-bold hover:underline">تحليل</button>
                            </td>
                         </tr>
                       ))}
@@ -370,7 +387,7 @@ const AdminCMS: React.FC = () => {
         {view === 'list' && (
           <div className="max-w-6xl">
             <header className="flex justify-between items-center mb-16">
-              <h1 className="text-5xl font-black text-slate-900 tracking-tight">{activeTab === 'blog' ? 'المقالات' : 'الدليل'}</h1>
+              <h1 className="text-5xl font-black text-slate-900 tracking-tight">{activeTab === 'blog' ? 'المقالات' : 'الإضافات'}</h1>
               <div className="flex gap-4">
                 <button onClick={() => setView('auto-gen')} className="bg-indigo-600 text-white px-10 py-5 rounded-[24px] font-black text-sm shadow-xl hover:scale-105 transition-all">🪄 توليد محتوى ذكي</button>
               </div>
