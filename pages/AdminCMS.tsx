@@ -140,11 +140,11 @@ const AdminCMS: React.FC = () => {
         contents: data.imgPrompt || `صورة احترافية حديثة لموضوع ${data.title}`,
       });
 
-      // الحل النهائي لـ TypeScript: استخدام متغير ثابت (Constant narrowing)
-      const candidates = imgResponse.candidates;
+      // الحل النهائي لـ TypeScript: فحص وجود candidates بشكل صريح وآمن
+      const candidates = imgResponse?.candidates;
       if (candidates && candidates.length > 0) {
         const parts = candidates[0].content?.parts;
-        if (parts) {
+        if (parts && parts.length > 0) {
           for (const part of parts) {
             if (part.inlineData && part.inlineData.data) {
               setGeneratedImageBase64(`data:image/png;base64,${part.inlineData.data}`);

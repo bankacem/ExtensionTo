@@ -28,12 +28,18 @@ const BatchStudio: React.FC = () => {
     try {
       const apiKey = process.env.API_KEY;
       if (!apiKey) throw new Error("Missing API Key");
+      // Use new GoogleGenAI instance for each request
       const ai = new GoogleGenAI({ apiKey });
+      
+      // Clean up base64 string to ensure it is valid raw data for the Blob part
+      const base64Data = base64.includes(',') ? base64.split(',')[1] : base64;
+
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: {
           parts: [
-            { inlineData: { mimeType: 'image/png', data: base64.split(',')[1] } },
+            // Ensure data is always a string to match the Blob interface requirements
+            { inlineData: { mimeType: 'image/png', data: base64Data || '' } },
             { text: "Analyze this browser extension screenshot. Identify the primary UI element. Return JSON: { \"focalPoint\": { \"x\": 0-100, \"y\": 0-100 }, \"description\": \"...\" }" }
           ]
         },
@@ -57,7 +63,10 @@ const BatchStudio: React.FC = () => {
         }
       });
 
-      const data = JSON.parse(response.text || '{}');
+      // Use .text property as per SDK guidelines
+      const textOutput = response.text;
+      if (!textOutput) throw new Error("No text response from AI");
+      const data = JSON.parse(textOutput);
       setBatch(prev => prev.map(item => item.id === id ? { ...item, aiAnalysis: data, status: 'ready' } : item));
     } catch (e) {
       console.error("AI Analysis failed:", e);
