@@ -51,7 +51,10 @@ const AdminCMS: React.FC = () => {
     
     setStatus({ loading: true, message: 'Waking up the AI... 🚀' });
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+      const apiKey = process.env.API_KEY;
+      if (!apiKey) throw new Error("API Key is missing");
+      
+      const ai = new GoogleGenAI({ apiKey });
       
       setStatus({ loading: true, message: 'Crafting content... ✍️' });
       const textRes = await ai.models.generateContent({
@@ -70,14 +73,16 @@ const AdminCMS: React.FC = () => {
         contents: data.imgPrompt || `Professional minimalist technology illustration for ${data.title}. clean white background style.`,
       });
 
-      let finalImg = '';
-      // Safe access to candidates and parts to prevent TS errors
-      const parts = imgRes.candidates?.[0]?.content?.parts;
-      if (parts && parts.length > 0) {
-        for (const part of parts) {
-          if (part.inlineData) {
-            finalImg = `data:image/png;base64,${part.inlineData.data}`;
-            setGeneratedImageBase64(finalImg);
+      // Strict check for candidates to satisfy TypeScript
+      if (imgRes.candidates && imgRes.candidates.length > 0) {
+        const candidate = imgRes.candidates[0];
+        if (candidate.content && candidate.content.parts) {
+          for (const part of candidate.content.parts) {
+            if (part.inlineData) {
+              const base64Data = part.inlineData.data;
+              const finalImg = `data:image/png;base64,${base64Data}`;
+              setGeneratedImageBase64(finalImg);
+            }
           }
         }
       }
@@ -88,7 +93,7 @@ const AdminCMS: React.FC = () => {
         content: data.content || "Content goes here...",
         excerpt: data.excerpt || "Brief excerpt...",
         readTime: data.readTime || "5 min read",
-        category: "Artificial Intelligence",
+        category: "Tech Insights",
         image: '', 
         date: new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })
       });
@@ -97,7 +102,7 @@ const AdminCMS: React.FC = () => {
       setView('edit'); 
     } catch (e) {
       console.error(e);
-      setStatus({ loading: false, message: 'Error! Please check your API Key and try again.' });
+      setStatus({ loading: false, message: 'Error! Please check your connection and try again.' });
     }
   };
 
@@ -114,79 +119,78 @@ const AdminCMS: React.FC = () => {
   };
 
   return (
-    <div className="flex min-h-screen bg-[#FDFDFD] text-gray-900 font-sans selection:bg-blue-100">
+    <div className="flex min-h-screen bg-[#FDFDFD] text-gray-900 font-sans">
       {/* Sidebar */}
       <aside className="w-80 bg-gray-950 text-white flex flex-col fixed inset-y-0 z-30 shadow-2xl">
         <div className="p-10 border-b border-gray-900 flex items-center gap-4">
-          <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black italic text-xl shadow-lg shadow-blue-600/20">ET</div>
+          <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black italic text-xl">ET</div>
           <h2 className="font-black text-xl tracking-tighter">ExtensionTo</h2>
         </div>
         
         <nav className="flex-grow p-8 space-y-2">
-          <button onClick={() => setView('dashboard')} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all font-bold text-sm ${view === 'dashboard' ? 'bg-blue-600' : 'text-gray-400 hover:bg-white/5'}`}>📊 Overview</button>
+          <button onClick={() => setView('dashboard')} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all font-bold text-sm ${view === 'dashboard' ? 'bg-blue-600' : 'text-gray-400 hover:bg-white/5'}`}>📊 Dashboard</button>
           <div className="h-px bg-white/5 my-6"></div>
           
           <div className="px-4 mb-4">
-            <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-4">AI Tools</p>
-            <button onClick={() => setView('auto-gen')} className={`w-full flex items-center justify-between px-5 py-4 rounded-2xl transition-all font-bold text-sm ${view === 'auto-gen' ? 'bg-purple-600 text-white shadow-lg' : 'text-purple-400 hover:bg-purple-600/10'}`}>
-               <span>🪄 Magic Author</span>
-               <span className="text-[8px] bg-white/20 px-2 py-0.5 rounded-full uppercase">NEW</span>
+            <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-4">AI Features</p>
+            <button onClick={() => setView('auto-gen')} className={`w-full flex items-center justify-between px-5 py-4 rounded-2xl transition-all font-bold text-sm ${view === 'auto-gen' ? 'bg-purple-600 text-white' : 'text-purple-400 hover:bg-purple-600/10'}`}>
+               <span>🪄 Magic Write</span>
+               <span className="text-[8px] bg-white/20 px-2 py-0.5 rounded-full">PRO</span>
             </button>
           </div>
 
           <div className="px-4">
-            <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-4">Content</p>
-            <button onClick={() => {setActiveTab('blog'); setView('list');}} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all font-bold text-sm ${activeTab === 'blog' && view === 'list' ? 'bg-blue-600' : 'text-gray-400 hover:bg-white/5'}`}>📄 Articles</button>
+            <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-4">Manage</p>
+            <button onClick={() => {setActiveTab('blog'); setView('list');}} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all font-bold text-sm ${activeTab === 'blog' && view === 'list' ? 'bg-blue-600' : 'text-gray-400 hover:bg-white/5'}`}>📄 Blog Posts</button>
             <button onClick={() => {setActiveTab('extension'); setView('list');}} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all font-bold text-sm ${activeTab === 'extension' && view === 'list' ? 'bg-blue-600' : 'text-gray-400 hover:bg-white/5'}`}>🧩 Extensions</button>
           </div>
         </nav>
       </aside>
 
       {/* Main Content */}
-      <main className="flex-grow ml-80 p-16 overflow-y-auto">
+      <main className="flex-grow ml-80 p-16">
         {view === 'dashboard' && (
-          <div className="max-w-6xl space-y-12 animate-in fade-in duration-500">
-            <header className="flex justify-between items-end bg-white p-12 rounded-[56px] border border-gray-100 apple-shadow">
+          <div className="max-w-6xl space-y-12">
+            <header className="flex justify-between items-end bg-white p-12 rounded-[48px] border border-gray-100 apple-shadow">
               <div>
-                <h1 className="text-5xl font-black text-gray-900 tracking-tight mb-4">Admin Dashboard</h1>
-                <p className="text-gray-400 text-lg font-medium">Welcome back. Let's create something extraordinary today.</p>
+                <h1 className="text-5xl font-black text-gray-900 mb-4">Console Overview</h1>
+                <p className="text-gray-400 text-lg font-medium">Monitoring directory performance and content growth.</p>
               </div>
-              <button onClick={() => setView('auto-gen')} className="px-10 py-5 bg-purple-600 text-white font-black rounded-3xl shadow-2xl shadow-purple-100 hover:scale-[1.05] transition-all">🪄 New AI Article</button>
+              <button onClick={() => setView('auto-gen')} className="px-10 py-5 bg-purple-600 text-white font-black rounded-3xl shadow-xl hover:scale-[1.05] transition-all">🪄 Create AI Post</button>
             </header>
             
             <div className="grid grid-cols-3 gap-8">
-              <div className="bg-white p-10 rounded-[40px] border border-gray-100 shadow-sm">
-                <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-3">Total Page Views</p>
+              <div className="bg-white p-10 rounded-[32px] border border-gray-100">
+                <p className="text-[10px] font-black uppercase text-gray-400 mb-3">Total Visits</p>
                 <span className="text-5xl font-black text-gray-900">{realStats.pageViews}</span>
               </div>
-              <div className="bg-white p-10 rounded-[40px] border border-gray-100 shadow-sm">
-                <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-3">Extension Installs</p>
+              <div className="bg-white p-10 rounded-[32px] border border-gray-100">
+                <p className="text-[10px] font-black uppercase text-gray-400 mb-3">Installs</p>
                 <span className="text-5xl font-black text-blue-600">{realStats.installs}</span>
               </div>
-              <div className="bg-white p-10 rounded-[40px] border border-gray-100 shadow-sm">
-                <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-3">Active Users</p>
-                <span className="text-5xl font-black text-red-500 animate-pulse">{realStats.liveNow}</span>
+              <div className="bg-white p-10 rounded-[32px] border border-gray-100">
+                <p className="text-[10px] font-black uppercase text-gray-400 mb-3">Live Now</p>
+                <span className="text-5xl font-black text-red-500">{realStats.liveNow}</span>
               </div>
             </div>
           </div>
         )}
 
         {view === 'auto-gen' && (
-          <div className="max-w-4xl mx-auto space-y-12 animate-in slide-in-from-bottom-8 duration-700">
+          <div className="max-w-4xl mx-auto space-y-12">
             <div className="text-center space-y-4">
-              <div className="w-24 h-24 bg-purple-100 text-purple-600 rounded-[38px] flex items-center justify-center text-5xl mx-auto shadow-inner">🪄</div>
-              <h1 className="text-6xl font-black text-gray-900 tracking-tighter">Magic Author</h1>
-              <p className="text-gray-500 font-medium text-xl">Enter a keyword, and Gemini will do the rest.</p>
+              <h1 className="text-6xl font-black text-gray-900">Magic Write</h1>
+              <p className="text-gray-500 text-xl font-medium">Generate high-quality SEO content in seconds.</p>
             </div>
 
-            <div className="bg-white p-14 rounded-[64px] border border-gray-50 shadow-2xl shadow-purple-100/50 space-y-10">
+            <div className="bg-white p-14 rounded-[56px] border border-gray-50 shadow-2xl space-y-10">
               <div className="space-y-4">
-                <label className="text-xs font-black text-gray-400 uppercase tracking-widest pl-4">Article Topic / SEO Keyword</label>
+                <label className="text-xs font-black text-gray-400 uppercase ml-4">What should we write about?</label>
                 <div className="flex gap-4">
                   <input 
                     type="text" 
-                    placeholder="e.g., Why Privacy Matters for Chrome Users in 2024" 
-                    className="flex-grow px-10 py-8 bg-gray-50 border border-gray-100 rounded-[32px] text-2xl font-bold outline-none focus:bg-white focus:ring-[12px] focus:ring-purple-50 transition-all placeholder:text-gray-200"
+                    placeholder="e.g., Best Productivity Tools for Chrome in 2025" 
+                    className="flex-grow px-8 py-6 bg-gray-50 border border-gray-100 rounded-[24px] text-xl font-bold outline-none focus:bg-white focus:ring-4 focus:ring-purple-100 transition-all"
                     value={seoKeyword} 
                     onChange={e => setSeoKeyword(e.target.value)} 
                     onKeyPress={(e) => e.key === 'Enter' && performFullAutoMagic()}
@@ -194,17 +198,16 @@ const AdminCMS: React.FC = () => {
                   <button 
                     onClick={performFullAutoMagic} 
                     disabled={status.loading}
-                    className="px-14 py-8 bg-purple-600 text-white font-black rounded-[32px] shadow-2xl hover:scale-105 active:scale-95 transition-all disabled:bg-gray-200"
+                    className="px-10 py-6 bg-purple-600 text-white font-black rounded-[24px] shadow-lg disabled:bg-gray-200"
                   >
-                    {status.loading ? 'Generating...' : 'Start Magic'}
+                    {status.loading ? 'Working...' : 'Generate'}
                   </button>
                 </div>
               </div>
-
               {status.loading && (
-                <div className="flex flex-col items-center gap-6 py-10 animate-in fade-in">
-                  <div className="w-16 h-16 border-[6px] border-purple-600 border-t-transparent rounded-full animate-spin"></div>
-                  <p className="font-black text-2xl text-purple-600 animate-pulse">{status.message}</p>
+                <div className="flex flex-col items-center gap-4 py-6">
+                  <div className="w-12 h-12 border-4 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
+                  <p className="font-bold text-purple-600">{status.message}</p>
                 </div>
               )}
             </div>
@@ -212,35 +215,28 @@ const AdminCMS: React.FC = () => {
         )}
 
         {view === 'list' && (
-          <div className="max-w-6xl animate-in fade-in duration-500">
+          <div className="max-w-6xl">
             <header className="flex justify-between items-center mb-16">
-              <h1 className="text-5xl font-black text-gray-900 tracking-tight">{activeTab === 'blog' ? 'Articles Library' : 'Extensions Manager'}</h1>
-              <div className="flex gap-4">
-                <button onClick={() => setView('auto-gen')} className="bg-purple-600 text-white px-8 py-5 rounded-[24px] font-black text-sm shadow-xl hover:bg-purple-700 transition-all">🪄 AI Generate</button>
-                <button onClick={() => {
-                  const id = `${activeTab === 'blog' ? 'post' : 'ext'}-${Date.now()}`;
-                  setCurrentEditItem(activeTab === 'blog' ? { id, title: '', content: '', category: 'Tech', excerpt: '', date: 'Today', readTime: '5 min', image: '' } : { id, name: '', shortDescription: '', category: 'Utility', rating: 5, users: '0', icon: '✨', features: [], version: '1.0', lastUpdated: 'Now', size: '1MB', storeUrl: '' });
-                  setView('edit');
-                }} className="bg-gray-900 text-white px-8 py-5 rounded-[24px] font-black text-sm shadow-xl hover:bg-black transition-all">+ Add New</button>
-              </div>
+              <h1 className="text-5xl font-black text-gray-900">{activeTab === 'blog' ? 'Blog Posts' : 'Extensions'}</h1>
+              <button onClick={() => setView('auto-gen')} className="bg-purple-600 text-white px-8 py-4 rounded-2xl font-black shadow-lg">🪄 AI Generate</button>
             </header>
 
-            <div className="bg-white rounded-[48px] border border-gray-50 shadow-sm overflow-hidden apple-shadow">
+            <div className="bg-white rounded-[32px] border border-gray-100 overflow-hidden shadow-sm">
               <table className="w-full">
                 <tbody className="divide-y divide-gray-50">
                   {(activeTab === 'blog' ? blogItems : extensionItems).map((item: any) => (
-                    <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
-                      <td className="px-12 py-10 flex items-center gap-8">
-                        <div className="w-20 h-20 bg-gray-100 rounded-[28px] flex items-center justify-center text-4xl shrink-0 overflow-hidden shadow-inner border border-gray-200/50">
+                    <tr key={item.id} className="hover:bg-gray-50/50">
+                      <td className="px-10 py-8 flex items-center gap-6">
+                        <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center text-3xl shrink-0 overflow-hidden">
                           {item.image ? <img src={item.image} className="w-full h-full object-cover" /> : item.icon || '📄'}
                         </div>
                         <div>
-                          <span className="font-black text-2xl text-gray-900 block mb-2">{item.title || item.name}</span>
-                          <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{item.category} • {item.date || item.lastUpdated}</span>
+                          <span className="font-black text-xl text-gray-900 block">{item.title || item.name}</span>
+                          <span className="text-[10px] font-bold text-gray-400 uppercase">{item.category}</span>
                         </div>
                       </td>
-                      <td className="px-12 py-10 text-right">
-                        <button onClick={() => { setCurrentEditItem({...item}); setView('edit'); }} className="px-6 py-3 bg-gray-50 text-gray-900 font-black text-xs rounded-xl hover:bg-gray-100 transition-colors">Edit</button>
+                      <td className="px-10 py-8 text-right">
+                        <button onClick={() => { setCurrentEditItem({...item}); setView('edit'); }} className="px-6 py-3 bg-gray-100 text-gray-900 font-bold rounded-xl hover:bg-gray-200">Edit</button>
                       </td>
                     </tr>
                   ))}
@@ -251,77 +247,50 @@ const AdminCMS: React.FC = () => {
         )}
 
         {view === 'edit' && currentEditItem && (
-          <div className="max-w-7xl mx-auto animate-in fade-in duration-500">
+          <div className="max-w-7xl mx-auto">
             <header className="flex justify-between items-center mb-12">
-               <div>
-                  <h1 className="text-4xl font-black text-gray-900 mb-2">Content Editor</h1>
-                  <p className="text-gray-400 font-medium text-lg">Finalize your content and publish it to the directory.</p>
-               </div>
+               <h1 className="text-4xl font-black text-gray-900">Content Editor</h1>
                <div className="flex gap-4">
-                  <button onClick={() => setView('list')} className="px-8 py-5 bg-white border border-gray-200 font-black text-sm rounded-2xl hover:bg-gray-50">Cancel</button>
-                  <button onClick={handleSave} className="px-12 py-5 bg-blue-600 text-white font-black text-sm rounded-2xl shadow-2xl shadow-blue-100 hover:bg-blue-700">Save & Publish</button>
+                  <button onClick={() => setView('list')} className="px-8 py-4 bg-white border border-gray-200 font-bold rounded-xl">Cancel</button>
+                  <button onClick={handleSave} className="px-10 py-4 bg-blue-600 text-white font-black rounded-xl">Save & Publish</button>
                </div>
             </header>
 
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-12">
-              <div className="lg:col-span-3 space-y-10">
-                <div className="bg-white p-14 rounded-[64px] border border-gray-50 shadow-sm apple-shadow space-y-10">
-                  <div className="space-y-4">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block pl-4">Title</label>
-                    <input className="w-full p-8 bg-gray-50 border border-gray-100 rounded-[32px] font-black text-4xl outline-none focus:bg-white focus:border-blue-500 transition-all" value={currentEditItem.title} onChange={e => setCurrentEditItem({...currentEditItem, title: e.target.value})} />
+            <div className="grid grid-cols-4 gap-12">
+              <div className="col-span-3 space-y-8">
+                <div className="bg-white p-12 rounded-[48px] border border-gray-100 shadow-sm space-y-8">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase">Title</label>
+                    <input className="w-full p-6 bg-gray-50 border border-gray-100 rounded-2xl font-black text-3xl outline-none focus:bg-white" value={currentEditItem.title} onChange={e => setCurrentEditItem({...currentEditItem, title: e.target.value})} />
                   </div>
-                  <div className="space-y-4">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block pl-4">HTML Content</label>
-                    <textarea className="w-full p-12 bg-gray-50 border border-gray-100 rounded-[48px] h-[800px] font-mono text-sm leading-relaxed outline-none focus:bg-white focus:border-blue-500 transition-all" value={currentEditItem.content} onChange={e => setCurrentEditItem({...currentEditItem, content: e.target.value})} />
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase">Content (HTML)</label>
+                    <textarea className="w-full p-8 bg-gray-50 border border-gray-100 rounded-3xl h-[600px] font-mono text-sm leading-relaxed outline-none focus:bg-white" value={currentEditItem.content} onChange={e => setCurrentEditItem({...currentEditItem, content: e.target.value})} />
                   </div>
                 </div>
               </div>
 
-              <div className="lg:col-span-1 space-y-8">
-                 <div className="bg-white p-10 rounded-[48px] border-2 border-purple-100 shadow-2xl shadow-purple-50 space-y-8">
-                    <div className="flex items-center gap-3">
-                       <div className="w-3 h-3 bg-purple-600 rounded-full animate-pulse"></div>
-                       <h3 className="font-black text-sm text-gray-900 uppercase tracking-widest">Hero Image</h3>
-                    </div>
-                    
-                    <div className="space-y-8">
-                      <div className="aspect-square bg-gray-100 rounded-[40px] border-2 border-dashed border-purple-200 flex flex-col items-center justify-center overflow-hidden relative shadow-inner">
+              <div className="col-span-1 space-y-8">
+                 <div className="bg-white p-8 rounded-[32px] border-2 border-purple-50 shadow-sm space-y-6">
+                    <h3 className="font-black text-sm text-gray-900 uppercase">Post Image</h3>
+                    <div className="aspect-square bg-gray-100 rounded-3xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center overflow-hidden">
                         {currentEditItem.image ? (
                           <img src={currentEditItem.image} className="w-full h-full object-cover" />
                         ) : generatedImageBase64 ? (
-                          <div className="text-center p-6 space-y-6">
-                            <img src={generatedImageBase64} className="w-full h-44 object-cover rounded-3xl shadow-2xl" />
-                            <a href={generatedImageBase64} download="post-image.png" className="inline-block px-6 py-3 bg-purple-600 text-white text-[11px] font-black rounded-full hover:bg-purple-700 shadow-lg">Download Image</a>
+                          <div className="text-center p-4">
+                            <img src={generatedImageBase64} className="w-full h-32 object-cover rounded-xl mb-4" />
+                            <a href={generatedImageBase64} download="image.png" className="text-[10px] bg-purple-600 text-white px-4 py-2 rounded-full font-bold">Download</a>
                           </div>
                         ) : (
-                          <span className="text-7xl grayscale opacity-10">🖼️</span>
+                          <span className="text-4xl opacity-20">🖼️</span>
                         )}
-                      </div>
-                      
-                      <div className="p-8 bg-purple-50 rounded-[32px] space-y-4 border border-purple-100">
-                        <p className="text-[11px] font-bold text-purple-900 leading-relaxed text-center">Paste the final Blogger image URL here:</p>
-                        <input 
-                          className="w-full p-4 bg-white border border-purple-200 rounded-2xl font-mono text-[10px] text-blue-600 placeholder:text-gray-300 text-center" 
-                          placeholder="https://blogger.com/..." 
-                          value={currentEditItem.image} 
-                          onChange={e => setCurrentEditItem({...currentEditItem, image: e.target.value})} 
-                        />
-                      </div>
                     </div>
-                 </div>
-
-                 <div className="bg-white p-10 rounded-[48px] border border-gray-100 shadow-sm space-y-6">
-                    <h3 className="font-black text-sm text-gray-400 uppercase tracking-widest border-b border-gray-50 pb-4">Metadata</h3>
-                    <div className="space-y-6">
-                      <div>
-                        <label className="text-[10px] font-black text-gray-400 block mb-2 pl-2">Category</label>
-                        <input className="w-full p-5 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-sm" value={currentEditItem.category} onChange={e => setCurrentEditItem({...currentEditItem, category: e.target.value})} />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-black text-gray-400 block mb-2 pl-2">Read Time</label>
-                        <input className="w-full p-5 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-sm" value={currentEditItem.readTime} onChange={e => setCurrentEditItem({...currentEditItem, readTime: e.target.value})} />
-                      </div>
-                    </div>
+                    <input 
+                      className="w-full p-3 bg-gray-50 border border-gray-100 rounded-xl text-[10px] font-mono" 
+                      placeholder="Paste final Blogger URL here..." 
+                      value={currentEditItem.image} 
+                      onChange={e => setCurrentEditItem({...currentEditItem, image: e.target.value})} 
+                    />
                  </div>
               </div>
             </div>
