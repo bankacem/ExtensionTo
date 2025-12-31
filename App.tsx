@@ -17,6 +17,20 @@ import AdminCMS from './pages/AdminCMS';
 import { EXTENSIONS, BLOG_POSTS as STATIC_POSTS } from './constants';
 import { PageType, BlogPost } from './types';
 
+// نظام التتبع البسيط
+const trackEvent = (type: 'view' | 'click' | 'install', metadata?: any) => {
+  const stats = JSON.parse(localStorage.getItem('et_analytics') || '[]');
+  stats.push({
+    type,
+    path: window.location.hash,
+    timestamp: new Date().toISOString(),
+    ...metadata
+  });
+  // الاحتفاظ بآخر 1000 حدث فقط لتوفير المساحة
+  if (stats.length > 1000) stats.shift();
+  localStorage.setItem('et_analytics', JSON.stringify(stats));
+};
+
 const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<PageType>('home');
   const [selectedExtensionId, setSelectedExtensionId] = useState<string | null>(null);
@@ -24,7 +38,6 @@ const App: React.FC = () => {
   const [dynamicPosts, setDynamicPosts] = useState<BlogPost[]>(STATIC_POSTS);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Filter for scheduled posts: Show only if current time >= publishDate
   const visiblePosts = dynamicPosts.filter(post => {
     if (!post.publishDate) return true;
     return new Date(post.publishDate).getTime() <= Date.now();
@@ -59,10 +72,16 @@ const App: React.FC = () => {
     const handleHashChange = () => {
       const hash = window.location.hash || '#home';
       
+      // تسجيل زيارة الصفحة
+      trackEvent('view');
+
       if (hash.startsWith('#detail/')) {
         const id = hash.replace('#detail/', '');
         const ext = EXTENSIONS.find(e => e.id === id);
-        if (ext) updateSEO(ext.name, ext.shortDescription);
+        if (ext) {
+          updateSEO(ext.name, ext.shortDescription);
+          trackEvent('click', { itemId: id, category: 'extension' });
+        }
         setSelectedExtensionId(id);
         setCurrentPage('detail');
       } else if (hash.startsWith('#blog/')) {
@@ -70,6 +89,7 @@ const App: React.FC = () => {
         const post = visiblePosts.find(p => p.id === id);
         if (post) {
           updateSEO(post.title, post.excerpt);
+          trackEvent('click', { itemId: id, category: 'blog' });
           setSelectedPostId(id);
           setCurrentPage('blog-post');
         } else {

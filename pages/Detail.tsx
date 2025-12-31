@@ -9,6 +9,16 @@ interface DetailProps {
 
 const Detail: React.FC<DetailProps> = ({ extension, onBack }) => {
   const handleAddToChrome = () => {
+    // تسجيل حدث التثبيت الحقيقي
+    const stats = JSON.parse(localStorage.getItem('et_analytics') || '[]');
+    stats.push({
+      type: 'install',
+      itemId: extension.id,
+      itemName: extension.name,
+      timestamp: new Date().toISOString()
+    });
+    localStorage.setItem('et_analytics', JSON.stringify(stats));
+    
     window.open(extension.storeUrl, '_blank', 'noopener,noreferrer');
   };
 
@@ -75,13 +85,6 @@ const Detail: React.FC<DetailProps> = ({ extension, onBack }) => {
                 ))}
               </div>
             </section>
-
-            <section className="mb-12">
-              <h2 className="text-xl font-bold text-gray-900 mb-6">Screenshots</h2>
-              <div className="aspect-video bg-gray-100 rounded-3xl flex items-center justify-center border border-gray-200">
-                <span className="text-gray-400 font-medium italic">Preview rendering optimized for your screen...</span>
-              </div>
-            </section>
           </div>
 
           {/* Sidebar / Actions */}
@@ -105,23 +108,7 @@ const Detail: React.FC<DetailProps> = ({ extension, onBack }) => {
                     <span className="text-gray-500">Updated</span>
                     <span className="text-gray-900 font-semibold">{extension.lastUpdated}</span>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Size</span>
-                    <span className="text-gray-900 font-semibold">{extension.size}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Language</span>
-                    <span className="text-gray-900 font-semibold">English</span>
-                  </div>
                 </div>
-              </div>
-
-              <div className="p-8 bg-blue-50/50 border border-blue-100 rounded-[32px]">
-                <h4 className="text-sm font-bold text-blue-900 mb-2">Privacy Commitment</h4>
-                <p className="text-xs text-blue-700 leading-relaxed mb-4">
-                  This extension does not collect your data, browser history, or personal information. Fully compliant with ExtensionTo Privacy Standards.
-                </p>
-                <a href="#privacy" className="text-xs font-bold text-blue-600 hover:underline">View Privacy Policy →</a>
               </div>
             </div>
           </div>
