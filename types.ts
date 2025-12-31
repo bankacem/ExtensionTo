@@ -40,4 +40,16 @@ export type PageType =
   | 'contact' 
   | 'help' 
   | 'report-abuse'
-  | 'cms';
+  | 'cms'
+  | 'batch-studio';
+
+export interface BatchItem {
+  id: string;
+  originalImage: string;
+  aiAnalysis: {
+    focalPoint: { x: number; y: number };
+    description: string;
+  } | null;
+  manualFocalPoint: { x: number; y: number } | null;
+  status: 'pending' | 'analyzing' | 'ready' | 'error';
+}

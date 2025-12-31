@@ -13,9 +13,7 @@ import {
   ResponsiveContainer,
   BarChart,
   Bar,
-  Cell,
-  PieChart,
-  Pie
+  Cell
 } from 'recharts';
 
 type ContentType = 'blog' | 'extension';
@@ -49,7 +47,6 @@ const AdminCMS: React.FC = () => {
   const [generatedImageBase64, setGeneratedImageBase64] = useState<string | null>(null);
   const [seoAuditResult, setSeoAuditResult] = useState<string | null>(null);
 
-  // الكلمات المفتاحية المتتبعة مع بيانات مطورة
   const [trackedKeywords] = useState<KeywordMetric[]>([
     { keyword: 'أفضل إضافات كروم 2025', intent: 'تجاري', difficulty: 45, score: 88, volume: '12.5k', competition: 'عالية' },
     { keyword: 'حماية الخصوصية في المتصفح', intent: 'معلوماتي', difficulty: 32, score: 92, volume: '8.2k', competition: 'متوسطة' },
@@ -69,7 +66,6 @@ const AdminCMS: React.FC = () => {
     return () => clearInterval(inv);
   }, []);
 
-  // توليد بيانات الرسوم البيانية بناءً على الأيام
   const chartData = useMemo(() => {
     const days = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
     return days.map(day => ({
@@ -104,10 +100,11 @@ const AdminCMS: React.FC = () => {
     if (!currentEditItem) return;
     setStatus({ loading: true, message: 'جاري تحليل المحتوى برمجياً... 🔍' });
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+      /* Initialization follows strictly named parameter with API_KEY from process.env */
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: `أنت خبير SEO محترف مثل Rank Math. قم بتحليل هذا العنوان: "${currentEditItem.title}" والمحتوى: "${currentEditItem.content?.substring(0, 1000)}". أعطني 3 نصائح محددة باللغة العربية لتحسين ترتيب المقال في جوجل. اجعل الإجابة موجزة.`
+        contents: `أنت خبير SEO محترف. قم بتحليل هذا العنوان: "${currentEditItem.title}" والمحتوى: "${currentEditItem.content?.substring(0, 1000)}". أعطني 3 نصائح محددة باللغة العربية لتحسين الترتيب في جوجل.`
       });
       setSeoAuditResult(response.text || "لم يتم العثور على رؤى.");
       setStatus({ loading: false, message: '' });
@@ -121,18 +118,18 @@ const AdminCMS: React.FC = () => {
     
     setStatus({ loading: true, message: 'جاري دراسة استراتيجية المحتوى... 🤖' });
     try {
-      const apiKey = process.env.API_KEY || "";
-      const ai = new GoogleGenAI({ apiKey });
+      /* Initialization follows strictly named parameter with API_KEY from process.env */
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
-      setStatus({ loading: true, message: 'جاري كتابة المقال بأعلى معايير SEO... ✍️' });
+      setStatus({ loading: true, message: 'جاري كتابة المقال... ✍️' });
       const textRes = await ai.models.generateContent({
         model: 'gemini-3-pro-preview',
-        contents: `قم بكتابة مقال SEO احترافي حول "${seoKeyword}" باللغة العربية. استخدم وسوم h2، مقدمة جذابة وخاتمة. التنسيق JSON: { "title": "...", "content": "...", "excerpt": "...", "readTime": "...", "imgPrompt": "..." }`,
+        contents: `اكتب مقال SEO احترافي حول "${seoKeyword}" بالعربية. التنسيق JSON: { "title": "...", "content": "...", "excerpt": "...", "readTime": "...", "imgPrompt": "..." }`,
         config: { responseMimeType: "application/json" }
       });
       
       const rawText = textRes.text;
-      if (!rawText) throw new Error("AI returned empty content");
+      if (!rawText) throw new Error("Empty AI response");
       const data = JSON.parse(rawText);
       
       setStatus({ loading: true, message: 'جاري تصميم صورة الغلاف... 🎨' });
@@ -141,12 +138,12 @@ const AdminCMS: React.FC = () => {
         contents: data.imgPrompt || `صورة احترافية حديثة لموضوع ${data.title}`,
       });
 
-      // إصلاح أخطاء TypeScript: فحص صارم وشامل
-      if (imgResponse && imgResponse.candidates && imgResponse.candidates.length > 0) {
+      // إصلاح الخطأ البرمجي عبر فحص وجود candidates بشكل صريح
+      if (imgResponse.candidates && imgResponse.candidates.length > 0) {
         const firstCandidate = imgResponse.candidates[0];
         if (firstCandidate.content && firstCandidate.content.parts) {
           for (const part of firstCandidate.content.parts) {
-            if (part && part.inlineData && part.inlineData.data) {
+            if (part.inlineData && part.inlineData.data) {
               setGeneratedImageBase64(`data:image/png;base64,${part.inlineData.data}`);
             }
           }
@@ -167,8 +164,8 @@ const AdminCMS: React.FC = () => {
       setStatus({ loading: false, message: '' });
       setView('edit'); 
     } catch (e) {
-      console.error(e);
-      setStatus({ loading: false, message: 'حدث خطأ في النظام.' });
+      console.error("AutoMagic Error:", e);
+      setStatus({ loading: false, message: 'حدث خطأ في النظام الذكي.' });
     }
   };
 
@@ -176,11 +173,9 @@ const AdminCMS: React.FC = () => {
     if (!currentEditItem) return;
     const items = activeTab === 'blog' ? [...blogItems] : [...extensionItems];
     const idx = items.findIndex(i => i.id === currentEditItem.id);
-    if (idx !== -1) {
-      items[idx] = currentEditItem;
-    } else {
-      items.unshift(currentEditItem);
-    }
+    if (idx !== -1) items[idx] = currentEditItem;
+    else items.unshift(currentEditItem);
+    
     if (activeTab === 'blog') setBlogItems(items as BlogPost[]);
     else setExtensionItems(items as Extension[]);
     setView('list');
@@ -220,9 +215,7 @@ const AdminCMS: React.FC = () => {
         </nav>
       </aside>
 
-      {/* Main Content Area */}
       <main className="flex-grow mr-80 p-16 overflow-y-auto">
-        
         {view === 'dashboard' && (
           <div className="max-w-6xl space-y-12 animate-in fade-in duration-500">
             <header className="flex justify-between items-end">
@@ -250,7 +243,7 @@ const AdminCMS: React.FC = () => {
               ))}
             </div>
 
-            {/* الرسوم البيانية التفاعلية */}
+            {/* الرسم البياني */}
             <div className="grid grid-cols-12 gap-8">
                <div className="col-span-8 bg-white p-12 rounded-[48px] border border-slate-100 shadow-sm">
                   <div className="flex justify-between items-center mb-10">
@@ -298,42 +291,6 @@ const AdminCMS: React.FC = () => {
                   <p className="mt-6 text-sm font-bold text-slate-400 text-center leading-relaxed">توضح البيانات تزايد التفاعل في فترات منتصف الأسبوع.</p>
                </div>
             </div>
-
-            <div className="bg-white p-12 rounded-[48px] border border-slate-100 shadow-sm">
-              <h3 className="text-xl font-black text-slate-900 mb-8">أبرز الكلمات المفتاحية</h3>
-              <div className="space-y-6">
-                 {trackedKeywords.map((kw, i) => (
-                   <div key={i} className="flex items-center justify-between p-6 bg-slate-50 rounded-3xl">
-                      <div className="flex items-center gap-6">
-                        <div className={`w-3 h-3 rounded-full ${kw.score > 80 ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
-                        <div className="flex flex-col">
-                           <span className="font-bold text-lg text-slate-700">{kw.keyword}</span>
-                           <span className="text-[10px] font-black text-slate-400 uppercase">{kw.intent}</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-12">
-                         <div className="text-center">
-                            <p className="text-[10px] font-black text-slate-400 uppercase">حجم البحث</p>
-                            <p className="font-black text-slate-700">{kw.volume}</p>
-                         </div>
-                         <div className="text-center">
-                            <p className="text-[10px] font-black text-slate-400 uppercase">المنافسة</p>
-                            <span className={`text-[10px] px-3 py-1 rounded-full font-black ${
-                               kw.competition === 'منخفضة' ? 'bg-green-100 text-green-600' :
-                               kw.competition === 'متوسطة' ? 'bg-yellow-100 text-yellow-600' :
-                               'bg-red-100 text-red-600'
-                            }`}>
-                               {kw.competition}
-                            </span>
-                         </div>
-                         <div className="w-16 h-16 rounded-full border-4 border-blue-600 flex items-center justify-center font-black text-blue-600 text-sm">
-                            {kw.score}
-                         </div>
-                      </div>
-                   </div>
-                 ))}
-              </div>
-            </div>
           </div>
         )}
 
@@ -351,7 +308,7 @@ const AdminCMS: React.FC = () => {
                          <th className="px-10 py-6 text-center">النية</th>
                          <th className="px-10 py-6 text-center">صعوبة SEO</th>
                          <th className="px-10 py-6 text-center">المنافسة</th>
-                         <th className="px-10 py-6 text-center">حجم البحث الشهري</th>
+                         <th className="px-10 py-6 text-center">حجم البحث</th>
                          <th className="px-10 py-6 text-left">الإجراءات</th>
                       </tr>
                    </thead>
@@ -406,7 +363,7 @@ const AdminCMS: React.FC = () => {
                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{item.category}</span>
                          <div className="w-1.5 h-1.5 bg-slate-200 rounded-full"></div>
                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-black text-blue-600 uppercase">نقاط SEO:</span>
+                            <span className="text-[10px] font-black text-blue-600 uppercase">SEO Score:</span>
                             <span className="font-black text-blue-600">{calculateSeoScore(item)}%</span>
                          </div>
                       </div>
@@ -435,12 +392,12 @@ const AdminCMS: React.FC = () => {
               <div className="col-span-8 space-y-10">
                 <div className="bg-white p-14 rounded-[56px] border border-slate-50 shadow-sm space-y-10">
                   <div className="space-y-4">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block pr-4">عنوان المقال</label>
-                    <input className="w-full p-8 bg-slate-50 border border-slate-100 rounded-[32px] font-black text-4xl outline-none focus:bg-white focus:border-blue-500 transition-all" value={currentEditItem.title} onChange={e => setCurrentEditItem({...currentEditItem, title: e.target.value})} />
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block pr-4">العنوان</label>
+                    <input className="w-full p-8 bg-slate-50 border border-slate-100 rounded-[32px] font-black text-4xl outline-none focus:bg-white focus:border-blue-500 transition-all text-right" value={currentEditItem.title} onChange={e => setCurrentEditItem({...currentEditItem, title: e.target.value})} />
                   </div>
                   <div className="space-y-4">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block pr-4">المحتوى النصي (HTML)</label>
-                    <textarea className="w-full p-12 bg-slate-50 border border-slate-100 rounded-[48px] h-[700px] font-mono text-sm leading-relaxed outline-none focus:bg-white focus:border-blue-500 transition-all" value={currentEditItem.content} onChange={e => setCurrentEditItem({...currentEditItem, content: e.target.value})} />
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block pr-4">المحتوى</label>
+                    <textarea className="w-full p-12 bg-slate-50 border border-slate-100 rounded-[48px] h-[700px] font-mono text-sm leading-relaxed outline-none focus:bg-white focus:border-blue-500 transition-all text-right" value={currentEditItem.content} onChange={e => setCurrentEditItem({...currentEditItem, content: e.target.value})} />
                   </div>
                 </div>
               </div>
@@ -448,50 +405,34 @@ const AdminCMS: React.FC = () => {
               <div className="col-span-4 space-y-8">
                  <div className="bg-white p-10 rounded-[48px] border-2 border-blue-50 shadow-2xl shadow-blue-100/20 space-y-8">
                     <div className="flex justify-between items-center border-b border-slate-50 pb-6">
-                       <h3 className="font-black text-sm text-slate-900 uppercase">نقاط Rank Math</h3>
+                       <h3 className="font-black text-sm text-slate-900 uppercase">نقاط SEO</h3>
                        <div className="w-16 h-16 rounded-full border-[6px] border-blue-600 flex items-center justify-center text-blue-600 font-black text-lg">
                           {calculateSeoScore(currentEditItem)}
                        </div>
                     </div>
-                    <ul className="space-y-4">
-                       <li className="flex items-center justify-between text-xs font-bold">
-                          <span className="text-slate-400">طول العنوان (40-60 حرف)</span>
-                          <span className={currentEditItem.title?.length > 40 ? 'text-green-500' : 'text-red-400'}>{currentEditItem.title?.length || 0}</span>
-                       </li>
-                       <li className="flex items-center justify-between text-xs font-bold">
-                          <span className="text-slate-400">طول المحتوى (>1000 كلمة)</span>
-                          <span className={currentEditItem.content?.length > 1000 ? 'text-green-500' : 'text-red-400'}>{currentEditItem.content?.length || 0}</span>
-                       </li>
-                       <li className="flex items-center justify-between text-xs font-bold">
-                          <span className="text-slate-400">الصورة البارزة</span>
-                          <span className={currentEditItem.image ? 'text-green-500' : 'text-red-400'}>{currentEditItem.image ? 'موجودة' : 'مفقودة'}</span>
-                       </li>
-                    </ul>
                     <button 
                       onClick={runSeoAudit}
                       className="w-full py-4 bg-slate-950 text-white rounded-2xl font-black text-xs hover:bg-blue-600 transition-all flex items-center justify-center gap-2"
                     >
-                       {status.loading ? 'جاري التحليل...' : 'تدقيق SEO ذكي'}
+                       {status.loading ? 'جاري التحليل...' : 'تدقيق SEO'}
                     </button>
                     {seoAuditResult && (
-                      <div className="p-6 bg-yellow-50 rounded-3xl border border-yellow-100 text-[11px] font-bold text-yellow-800 italic leading-relaxed">
+                      <div className="p-6 bg-yellow-50 rounded-3xl border border-yellow-100 text-[11px] font-bold text-yellow-800 italic leading-relaxed text-right">
                         ✨ {seoAuditResult}
                       </div>
                     )}
                  </div>
 
                  <div className="bg-white p-10 rounded-[48px] border border-slate-100 shadow-sm space-y-8">
-                    <h3 className="font-black text-sm text-slate-400 uppercase tracking-widest text-center">الوسائط البارزة</h3>
+                    <h3 className="font-black text-sm text-slate-400 uppercase tracking-widest text-center">الوسائط</h3>
                     <div className="aspect-video bg-slate-50 rounded-[32px] border-2 border-dashed border-slate-200 flex flex-col items-center justify-center overflow-hidden shadow-inner">
-                        {currentEditItem.image ? (
-                          <img src={currentEditItem.image} className="w-full h-full object-cover" />
-                        ) : generatedImageBase64 ? (
-                          <img src={generatedImageBase64} className="w-full h-full object-cover" />
+                        {currentEditItem.image || generatedImageBase64 ? (
+                          <img src={currentEditItem.image || (generatedImageBase64 as string)} className="w-full h-full object-cover" />
                         ) : (
                           <span className="text-5xl grayscale opacity-10">🖼️</span>
                         )}
                     </div>
-                    <input className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-mono text-[10px] text-blue-600 text-center" placeholder="رابط الصورة المباشر" value={currentEditItem.image} onChange={e => setCurrentEditItem({...currentEditItem, image: e.target.value})} />
+                    <input className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-mono text-[10px] text-blue-600 text-center" placeholder="رابط الصورة" value={currentEditItem.image} onChange={e => setCurrentEditItem({...currentEditItem, image: e.target.value})} />
                  </div>
               </div>
             </div>
@@ -502,28 +443,27 @@ const AdminCMS: React.FC = () => {
           <div className="max-w-4xl mx-auto space-y-12 animate-in slide-in-from-bottom-8 duration-700 text-center">
             <div className="space-y-4">
               <div className="w-20 h-20 bg-indigo-100 text-indigo-600 rounded-[32px] flex items-center justify-center text-4xl mx-auto mb-8 shadow-inner border border-indigo-200">🪄</div>
-              <h1 className="text-6xl font-black text-slate-900 tracking-tight">محرك النمو الذكي</h1>
-              <p className="text-slate-500 font-medium text-xl max-w-lg mx-auto">قم بتوليد مقالات عالية التحويل ومحسنة لمحركات البحث في ثوانٍ معدودة.</p>
+              <h1 className="text-6xl font-black text-slate-900 tracking-tight">محرك النمو</h1>
+              <p className="text-slate-500 font-medium text-xl max-w-lg mx-auto">توليد مقالات احترافية بضغطة زر واحدة.</p>
             </div>
 
             <div className="bg-white p-14 rounded-[64px] border border-slate-100 shadow-2xl space-y-10">
               <div className="space-y-4 text-right">
-                <label className="text-xs font-black text-slate-400 uppercase tracking-widest pr-4">الكلمة المفتاحية المستهدفة</label>
+                <label className="text-xs font-black text-slate-400 uppercase tracking-widest pr-4">الكلمة المفتاحية</label>
                 <div className="flex gap-4">
                   <input 
                     type="text" 
-                    placeholder="مثال: أفضل إضافات الخصوصية لكروم" 
-                    className="flex-grow px-10 py-8 bg-slate-50 border border-slate-100 rounded-[32px] text-2xl font-bold outline-none focus:bg-white focus:ring-[12px] focus:ring-blue-50 transition-all text-right"
+                    placeholder="مثال: أفضل إضافات كروم للخصوصية" 
+                    className="flex-grow px-10 py-8 bg-slate-50 border border-slate-100 rounded-[32px] text-2xl font-bold outline-none focus:bg-white transition-all text-right"
                     value={seoKeyword} 
                     onChange={e => setSeoKeyword(e.target.value)} 
-                    onKeyPress={(e) => e.key === 'Enter' && performFullAutoMagic()}
                   />
                   <button 
                     onClick={performFullAutoMagic} 
                     disabled={status.loading}
                     className="px-14 py-8 bg-slate-950 text-white font-black rounded-[32px] shadow-2xl hover:scale-105 transition-all disabled:bg-slate-200"
                   >
-                    {status.loading ? 'جاري البحث...' : 'ابنِ المقال الآن'}
+                    {status.loading ? 'جاري العمل...' : 'توليد'}
                   </button>
                 </div>
               </div>
