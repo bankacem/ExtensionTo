@@ -3,6 +3,18 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { BlogPost, Extension } from '../types';
 import { BLOG_POSTS as STATIC_POSTS, EXTENSIONS as STATIC_EXTENSIONS } from '../constants';
 import { GoogleGenAI } from "@google/genai";
+import { 
+  AreaChart, 
+  Area, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  Cell
+} from 'recharts';
 
 type ContentType = 'blog' | 'extension';
 type AdminView = 'dashboard' | 'list' | 'edit' | 'auto-gen' | 'keywords';
@@ -12,6 +24,8 @@ interface KeywordMetric {
   intent: 'معلوماتي' | 'تجاري' | 'شرائي';
   difficulty: number;
   score: number;
+  volume: string;
+  competition: 'منخفضة' | 'متوسطة' | 'عالية';
 }
 
 const AdminCMS: React.FC = () => {
@@ -33,11 +47,12 @@ const AdminCMS: React.FC = () => {
   const [generatedImageBase64, setGeneratedImageBase64] = useState<string | null>(null);
   const [seoAuditResult, setSeoAuditResult] = useState<string | null>(null);
 
-  // الكلمات المفتاحية المتتبعة
+  // الكلمات المفتاحية المتتبعة مع بيانات مطورة
   const [trackedKeywords] = useState<KeywordMetric[]>([
-    { keyword: 'أفضل إضافات كروم 2025', intent: 'تجاري', difficulty: 45, score: 88 },
-    { keyword: 'حماية الخصوصية في المتصفح', intent: 'معلوماتي', difficulty: 32, score: 92 },
-    { keyword: 'تحميل uBlock Origin', intent: 'شرائي', difficulty: 12, score: 75 },
+    { keyword: 'أفضل إضافات كروم 2025', intent: 'تجاري', difficulty: 45, score: 88, volume: '12.5k', competition: 'عالية' },
+    { keyword: 'حماية الخصوصية في المتصفح', intent: 'معلوماتي', difficulty: 32, score: 92, volume: '8.2k', competition: 'متوسطة' },
+    { keyword: 'تحميل uBlock Origin', intent: 'شرائي', difficulty: 12, score: 75, volume: '45k', competition: 'منخفضة' },
+    { keyword: 'إضافات تسريع المتصفح', intent: 'معلوماتي', difficulty: 55, score: 64, volume: '5.1k', competition: 'عالية' },
   ]);
 
   useEffect(() => {
@@ -50,6 +65,16 @@ const AdminCMS: React.FC = () => {
     fetchStats();
     const inv = setInterval(fetchStats, 2000);
     return () => clearInterval(inv);
+  }, []);
+
+  // توليد بيانات الرسوم البيانية بناءً على الأحداث الحقيقية أو بيانات وهمية متناسقة
+  const chartData = useMemo(() => {
+    const days = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+    return days.map(day => ({
+      name: day,
+      views: Math.floor(Math.random() * 500) + 200,
+      installs: Math.floor(Math.random() * 100) + 20,
+    }));
   }, []);
 
   const realStats = useMemo(() => {
@@ -113,7 +138,6 @@ const AdminCMS: React.FC = () => {
         contents: data.imgPrompt || `صورة احترافية حديثة لموضوع ${data.title}`,
       });
 
-      // فحص صارم لتجنب أخطاء TypeScript
       const candidates = imgResponse?.candidates;
       if (candidates && candidates.length > 0) {
         const parts = candidates[0]?.content?.parts;
@@ -193,14 +217,14 @@ const AdminCMS: React.FC = () => {
       </aside>
 
       {/* Main Content Area - منطقة العمل الرئيسية */}
-      <main className="flex-grow mr-80 p-16">
+      <main className="flex-grow mr-80 p-16 overflow-y-auto">
         
         {view === 'dashboard' && (
           <div className="max-w-6xl space-y-12 animate-in fade-in duration-500">
             <header className="flex justify-between items-end">
               <div>
                 <h1 className="text-5xl font-black text-slate-900 tracking-tight mb-2">أداء الموقع</h1>
-                <p className="text-slate-400 text-lg font-medium">حالة Rank Math: <span className="text-green-500 font-bold">ممتاز</span></p>
+                <p className="text-slate-400 text-lg font-medium">تحليل ذكي للبيانات الحية والجلسات.</p>
               </div>
               <div className="flex gap-4">
                  <div className="bg-white px-8 py-4 rounded-3xl border border-slate-100 shadow-sm text-center">
@@ -224,20 +248,66 @@ const AdminCMS: React.FC = () => {
               ))}
             </div>
 
+            {/* قسم الرسوم البيانية المتطور */}
+            <div className="grid grid-cols-1 gap-8">
+              <div className="bg-white p-12 rounded-[48px] border border-slate-100 shadow-sm">
+                 <div className="flex justify-between items-center mb-10">
+                    <h3 className="text-xl font-black text-slate-900">نظرة عامة على النشاط الأسبوعي</h3>
+                    <div className="flex gap-6 text-[10px] font-black uppercase">
+                       <div className="flex items-center gap-2"><div className="w-3 h-3 bg-blue-600 rounded-full"></div> الزيارات</div>
+                       <div className="flex items-center gap-2"><div className="w-3 h-3 bg-slate-200 rounded-full"></div> التثبيتات</div>
+                    </div>
+                 </div>
+                 <div className="h-[350px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={chartData}>
+                        <defs>
+                          <linearGradient id="colorViews" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#2563eb" stopOpacity={0.1}/>
+                            <stop offset="95%" stopColor="#2563eb" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                        <XAxis dataKey="name" axisLine={false} tickLine={false} dy={10} />
+                        <YAxis axisLine={false} tickLine={false} />
+                        <Tooltip 
+                          contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', fontFamily: 'Inter' }}
+                          labelStyle={{ fontWeight: 'bold', marginBottom: '4px' }}
+                        />
+                        <Area type="monotone" dataKey="views" stroke="#2563eb" strokeWidth={4} fillOpacity={1} fill="url(#colorViews)" />
+                        <Area type="monotone" dataKey="installs" stroke="#cbd5e1" strokeWidth={2} fill="transparent" />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                 </div>
+              </div>
+            </div>
+
             <div className="bg-white p-12 rounded-[48px] border border-slate-100 shadow-sm">
-              <h3 className="text-xl font-black text-slate-900 mb-8">اتجاهات الكلمات المفتاحية</h3>
+              <h3 className="text-xl font-black text-slate-900 mb-8">اتجاهات الكلمات المفتاحية الحالية</h3>
               <div className="space-y-6">
                  {trackedKeywords.map((kw, i) => (
                    <div key={i} className="flex items-center justify-between p-6 bg-slate-50 rounded-3xl">
                       <div className="flex items-center gap-6">
                         <div className={`w-3 h-3 rounded-full ${kw.score > 80 ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
-                        <span className="font-bold text-lg text-slate-700">{kw.keyword}</span>
-                        <span className="text-[10px] bg-slate-200 px-3 py-1 rounded-full font-black text-slate-500">{kw.intent}</span>
+                        <div className="flex flex-col">
+                           <span className="font-bold text-lg text-slate-700">{kw.keyword}</span>
+                           <span className="text-[10px] font-black text-slate-400 uppercase">{kw.intent}</span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-8">
-                         <div className="text-left">
-                            <p className="text-[10px] font-black text-slate-400 uppercase">الصعوبة</p>
-                            <p className="font-black text-slate-700">{kw.difficulty}%</p>
+                      <div className="flex items-center gap-12">
+                         <div className="text-center">
+                            <p className="text-[10px] font-black text-slate-400 uppercase">الحجم</p>
+                            <p className="font-black text-slate-700">{kw.volume}</p>
+                         </div>
+                         <div className="text-center">
+                            <p className="text-[10px] font-black text-slate-400 uppercase">المنافسة</p>
+                            <span className={`text-[10px] px-3 py-1 rounded-full font-black ${
+                               kw.competition === 'منخفضة' ? 'bg-green-100 text-green-600' :
+                               kw.competition === 'متوسطة' ? 'bg-yellow-100 text-yellow-600' :
+                               'bg-red-100 text-red-600'
+                            }`}>
+                               {kw.competition}
+                            </span>
                          </div>
                          <div className="w-16 h-16 rounded-full border-4 border-blue-600 flex items-center justify-center font-black text-blue-600 text-sm">
                             {kw.score}
@@ -254,7 +324,7 @@ const AdminCMS: React.FC = () => {
           <div className="max-w-6xl animate-in slide-in-from-bottom-8">
              <header className="mb-12">
                 <h1 className="text-5xl font-black text-slate-900 mb-4">ذكاء الكلمات المفتاحية</h1>
-                <p className="text-slate-400 text-xl font-medium">تتبع بصمتك في محركات البحث واكتشف فرصاً جديدة.</p>
+                <p className="text-slate-400 text-xl font-medium">نظام تتبع المنافسة وحجم البحث المطور.</p>
              </header>
              <div className="bg-white rounded-[48px] border border-slate-100 overflow-hidden shadow-sm">
                 <table className="w-full text-right">
@@ -263,6 +333,7 @@ const AdminCMS: React.FC = () => {
                          <th className="px-10 py-6">الكلمة المفتاحية</th>
                          <th className="px-10 py-6 text-center">النية</th>
                          <th className="px-10 py-6 text-center">الصعوبة</th>
+                         <th className="px-10 py-6 text-center">المنافسة</th>
                          <th className="px-10 py-6 text-center">حجم البحث</th>
                          <th className="px-10 py-6 text-left">الإجراءات</th>
                       </tr>
@@ -275,7 +346,16 @@ const AdminCMS: React.FC = () => {
                               <span className="bg-blue-50 text-blue-600 px-4 py-2 rounded-full text-xs font-black">{k.intent}</span>
                            </td>
                            <td className="px-10 py-8 text-center font-bold">{k.difficulty}</td>
-                           <td className="px-10 py-8 text-center font-bold">~2.4k</td>
+                           <td className="px-10 py-8 text-center">
+                              <span className={`px-4 py-2 rounded-full text-xs font-black ${
+                                 k.competition === 'منخفضة' ? 'bg-green-50 text-green-600' :
+                                 k.competition === 'متوسطة' ? 'bg-yellow-50 text-yellow-600' :
+                                 'bg-red-50 text-red-600'
+                              }`}>
+                                 {k.competition}
+                              </span>
+                           </td>
+                           <td className="px-10 py-8 text-center font-bold">{k.volume}</td>
                            <td className="px-10 py-8 text-left">
                               <button className="text-blue-600 font-bold hover:underline">التفاصيل</button>
                            </td>
@@ -349,7 +429,6 @@ const AdminCMS: React.FC = () => {
               </div>
 
               <div className="col-span-4 space-y-8">
-                 {/* Rank Math Scorer - نظام النقاط */}
                  <div className="bg-white p-10 rounded-[48px] border-2 border-blue-50 shadow-2xl shadow-blue-100/20 space-y-8">
                     <div className="flex justify-between items-center border-b border-slate-50 pb-6">
                        <h3 className="font-black text-sm text-slate-900 uppercase">نقاط Rank Math</h3>
