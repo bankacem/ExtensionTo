@@ -1,8 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { BlogPost, Extension } from '../types';
-import { BLOG_POSTS as STATIC_POSTS, EXTENSIONS as STATIC_EXTENSIONS } from '../constants';
-import { GoogleGenAI } from "@google/genai";
 import { 
   AreaChart, 
   Area, 
@@ -30,14 +28,8 @@ interface KeywordMetric {
 
 const AdminCMS: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ContentType>('blog');
-  const [blogItems, setBlogItems] = useState<BlogPost[]>(() => {
-    const saved = localStorage.getItem('cms_blog_posts');
-    return saved ? JSON.parse(saved) : STATIC_POSTS;
-  });
-  const [extensionItems, setExtensionItems] = useState<Extension[]>(() => {
-    const saved = localStorage.getItem('cms_extensions');
-    return saved ? JSON.parse(saved) : STATIC_EXTENSIONS;
-  });
+  const [blogItems, setBlogItems] = useState<BlogPost[]>([]);
+  const [extensionItems, setExtensionItems] = useState<Extension[]>([]);
 
   const [view, setView] = useState<AdminView>('dashboard');
   const [currentEditItem, setCurrentEditItem] = useState<any>(null);
@@ -46,6 +38,7 @@ const AdminCMS: React.FC = () => {
   const [analyticsData, setAnalyticsData] = useState<any[]>([]);
   const [generatedImageBase64, setGeneratedImageBase64] = useState<string | null>(null);
   const [seoAuditResult, setSeoAuditResult] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const [trackedKeywords] = useState<KeywordMetric[]>([
     { keyword: 'أفضل إضافات كروم 2025', intent: 'تجاري', difficulty: 45, score: 88, volume: '12.5k', competition: 'عالية' },
@@ -55,9 +48,27 @@ const AdminCMS: React.FC = () => {
   ]);
 
   useEffect(() => {
-    localStorage.setItem('cms_blog_posts', JSON.stringify(blogItems));
-    localStorage.setItem('cms_extensions', JSON.stringify(extensionItems));
-  }, [blogItems, extensionItems]);
+    const fetchData = async () => {
+      setError(null);
+      try {
+        const [blogResponse, extensionsResponse] = await Promise.all([
+          fetch('/api/blog'),
+          fetch('/api/extensions')
+        ]);
+        if (!blogResponse.ok || !extensionsResponse.ok) {
+          throw new Error('Network response was not ok');
+        }
+        const blogData = await blogResponse.json();
+        const extensionsData = await extensionsResponse.json();
+        setBlogItems(blogData);
+        setExtensionItems(extensionsData);
+      } catch (error) {
+        console.error("Failed to fetch CMS data:", error);
+        setError("Failed to load content. Please try again later.");
+      }
+    };
+    fetchData();
+  }, []);
 
   useEffect(() => {
     const fetchStats = () => setAnalyticsData(JSON.parse(localStorage.getItem('et_analytics') || '[]'));
@@ -100,55 +111,45 @@ const AdminCMS: React.FC = () => {
     if (!currentEditItem) return;
     setStatus({ loading: true, message: 'جاري تحليل المحتوى برمجياً... 🔍' });
     try {
-      const apiKey = process.env.API_KEY || "";
-      const ai = new GoogleGenAI({ apiKey });
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: `أنت خبير SEO محترف. قم بتحليل هذا العنوان: "${currentEditItem.title}" والمحتوى: "${currentEditItem.content?.substring(0, 1000)}". أعطني 3 نصائح محددة باللغة العربية لتحسين الترتيب في جوجل.`
+      const response = await fetch('/api/seo-audit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ title: currentEditItem.title, content: currentEditItem.content }),
       });
-      setSeoAuditResult(response.text || "لم يتم العثور على رؤى.");
-      setStatus({ loading: false, message: '' });
+
+      if (!response.ok) {
+        throw new Error('Failed to run SEO audit');
+      }
+
+      const data = await response.json();
+      setSeoAuditResult(data.auditResult || "لم يتم العثور على رؤى.");
     } catch (e) {
-      setStatus({ loading: false, message: 'فشل التدقيق.' });
+      setSeoAuditResult("فشل التدقيق. يرجى المحاولة مرة أخرى.");
+    } finally {
+      setStatus({ loading: false, message: '' });
     }
   };
 
   const performFullAutoMagic = async () => {
     if (!seoKeyword) return alert("يرجى إدخال الكلمة المفتاحية أولاً");
     
-    setStatus({ loading: true, message: 'جاري دراسة استراتيجية المحتوى... 🤖' });
+    setStatus({ loading: true, message: 'جاري كتابة المقال... ✍️' });
     try {
-      const apiKey = process.env.API_KEY || "";
-      const ai = new GoogleGenAI({ apiKey });
-      
-      setStatus({ loading: true, message: 'جاري كتابة المقال... ✍️' });
-      const textRes = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
-        contents: `اكتب مقال SEO احترافي حول "${seoKeyword}" بالعربية. التنسيق JSON: { "title": "...", "content": "...", "excerpt": "...", "readTime": "...", "imgPrompt": "..." }`,
-        config: { responseMimeType: "application/json" }
-      });
-      
-      const rawText = textRes.text;
-      if (!rawText) throw new Error("Empty AI response");
-      const data = JSON.parse(rawText);
-      
-      setStatus({ loading: true, message: 'جاري تصميم صورة الغلاف... 🎨' });
-      const imgResponse = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-image',
-        contents: data.imgPrompt || `صورة احترافية حديثة لموضوع ${data.title}`,
+      const response = await fetch('/api/generate-content', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ keyword: seoKeyword }),
       });
 
-      // استخدام Optional Chaining وفحص صارم للمصفوفات
-      const firstCandidate = imgResponse?.candidates?.[0];
-      const parts = firstCandidate?.content?.parts;
-      
-      if (parts && parts.length > 0) {
-        for (const part of parts) {
-          if (part.inlineData?.data) {
-            setGeneratedImageBase64(`data:image/png;base64,${part.inlineData.data}`);
-          }
-        }
+      if (!response.ok) {
+        throw new Error('Failed to generate content');
       }
+
+      const data = await response.json();
 
       setCurrentEditItem({
         id: `post-${Date.now()}`,
@@ -166,21 +167,43 @@ const AdminCMS: React.FC = () => {
     } catch (e) {
       console.error("AutoMagic Error:", e);
       setStatus({ loading: false, message: 'حدث خطأ في النظام الذكي.' });
+      setError("Failed to generate content. Please try again later.");
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!currentEditItem) return;
+
     const items = activeTab === 'blog' ? [...blogItems] : [...extensionItems];
     const idx = items.findIndex(i => i.id === currentEditItem.id);
     if (idx !== -1) items[idx] = currentEditItem;
     else items.unshift(currentEditItem);
-    
-    if (activeTab === 'blog') setBlogItems(items as BlogPost[]);
-    else setExtensionItems(items as Extension[]);
-    setView('list');
-  };
 
+    const endpoint = activeTab === 'blog' ? '/api/blog' : '/api/extensions';
+    
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(items),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save data');
+      }
+
+      if (activeTab === 'blog') setBlogItems(items as BlogPost[]);
+      else setExtensionItems(items as Extension[]);
+
+      setView('list');
+
+    } catch (error) {
+      console.error("Save failed:", error);
+      setError("Failed to save data. Please try again later.");
+    }
+  };
   return (
     <div className="flex min-h-screen bg-[#F8FAFC] text-slate-900 font-sans" dir="rtl">
       {/* Sidebar */}
@@ -204,7 +227,7 @@ const AdminCMS: React.FC = () => {
             <button onClick={() => {setActiveTab('extension'); setView('list');}} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all font-bold text-sm ${activeTab === 'extension' && view === 'list' ? 'bg-indigo-600' : 'text-slate-400 hover:bg-white/5'}`}>🧩 الإضافات</button>
           </div>
           <div className="absolute bottom-10 left-8 right-8">
-            <button onClick={() => setView('auto-gen')} className="w-full py-5 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-2xl font-black text-xs shadow-2xl hover:scale-105 transition-transform flex items-center justify-center gap-2">
+            <button onClick={() => setView('auto-gen')} className={`w-full py-5 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-2xl font-black text-xs shadow-2xl hover:scale-105 transition-transform flex items-center justify-center gap-2`}>
               🪄 مولد المحتوى الذكي
             </button>
           </div>
@@ -212,6 +235,12 @@ const AdminCMS: React.FC = () => {
       </aside>
 
       <main className="flex-grow mr-80 p-16 overflow-y-auto">
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-4" role="alert">
+            <strong className="font-bold">Error:</strong>
+            <span className="block sm:inline"> {error}</span>
+          </div>
+        )}
         {view === 'dashboard' && (
           <div className="max-w-6xl space-y-12 animate-in fade-in duration-500">
             <header className="flex justify-between items-end">
