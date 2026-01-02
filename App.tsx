@@ -15,8 +15,7 @@ import Help from './pages/Help';
 import ReportAbuse from './pages/ReportAbuse';
 import AdminCMS from './pages/AdminCMS';
 import BatchStudio from './pages/BatchStudio';
-import { EXTENSIONS, BLOG_POSTS as STATIC_POSTS } from './constants';
-import { PageType, BlogPost } from './types';
+import { PageType, BlogPost, Extension } from './types';
 
 // نظام التتبع البسيط
 const trackEvent = (type: 'view' | 'click' | 'install', metadata?: any) => {
@@ -36,8 +35,10 @@ const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<PageType>('home');
   const [selectedExtensionId, setSelectedExtensionId] = useState<string | null>(null);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
-  const [dynamicPosts, setDynamicPosts] = useState<BlogPost[]>(STATIC_POSTS);
+  const [dynamicPosts, setDynamicPosts] = useState<BlogPost[]>([]);
+  const [extensions, setExtensions] = useState<Extension[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const visiblePosts = dynamicPosts.filter(post => {
     if (!post.publishDate) return true;
@@ -45,20 +46,33 @@ const App: React.FC = () => {
   });
 
   useEffect(() => {
-    const fetchArticles = async () => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      setError(null);
       try {
-        const response = await fetch('./articles.json');
-        if (response.ok) {
-          const data = await response.json();
-          setDynamicPosts(Array.isArray(data) ? [...STATIC_POSTS, ...data] : STATIC_POSTS);
+        const [blogResponse, extensionsResponse] = await Promise.all([
+          fetch('/api/blog'),
+          fetch('/api/extensions')
+        ]);
+
+        if (!blogResponse.ok || !extensionsResponse.ok) {
+          throw new Error('Network response was not ok');
         }
+
+        const blogData = await blogResponse.json();
+        const extensionsData = await extensionsResponse.json();
+
+        setDynamicPosts(blogData);
+        setExtensions(extensionsData);
+
       } catch (error) {
-        console.log("Using static fallback content.");
+        console.error("Failed to fetch data:", error);
+        setError("Failed to load data. Please try again later.");
       } finally {
         setIsLoading(false);
       }
     };
-    fetchArticles();
+    fetchData();
   }, []);
 
   useEffect(() => {
@@ -73,12 +87,11 @@ const App: React.FC = () => {
     const handleHashChange = () => {
       const hash = window.location.hash || '#home';
       
-      // تسجيل زيارة الصفحة
       trackEvent('view');
 
       if (hash.startsWith('#detail/')) {
         const id = hash.replace('#detail/', '');
-        const ext = EXTENSIONS.find(e => e.id === id);
+        const ext = extensions.find(e => e.id === id);
         if (ext) {
           updateSEO(ext.name, ext.shortDescription);
           trackEvent('click', { itemId: id, category: 'extension' });
@@ -140,7 +153,7 @@ const App: React.FC = () => {
     handleHashChange();
 
     return () => window.removeEventListener('hashchange', handleHashChange);
-  }, [dynamicPosts, visiblePosts]);
+  }, [dynamicPosts, visiblePosts, extensions]);
 
   const navigateTo = (hash: string) => {
     window.location.hash = hash;
@@ -154,6 +167,14 @@ const App: React.FC = () => {
     );
   }
 
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <p className="text-red-500">{error}</p>
+      </div>
+    );
+  }
+
   if (currentPage === 'cms') {
     return (
       <Layout onNavigate={navigateTo} currentPage={currentPage}>
@@ -162,7 +183,7 @@ const App: React.FC = () => {
     );
   }
 
-  const selectedExtension = EXTENSIONS.find(e => e.id === selectedExtensionId);
+  const selectedExtension = extensions.find(e => e.id === selectedExtensionId);
   const selectedPost = visiblePosts.find(p => p.id === selectedPostId);
 
   return (
