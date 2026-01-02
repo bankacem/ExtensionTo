@@ -1,30 +1,48 @@
 
-import React, { useState, useMemo } from 'react';
-import { EXTENSIONS } from '../constants';
+import React, { useState, useMemo, useEffect } from 'react';
 import ExtensionCard from '../components/ExtensionCard';
 import Newsletter from '../components/Newsletter';
+import { Extension } from '../types';
 
 interface HomeProps {
   onSelect: (id: string) => void;
 }
 
 const Home: React.FC<HomeProps> = ({ onSelect }) => {
+  const [extensions, setExtensions] = useState<Extension[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
 
-  const categories = useMemo(() => {
-    const cats = ['All', ...new Set(EXTENSIONS.map(ext => ext.category))];
-    return cats;
+  useEffect(() => {
+    const fetchExtensions = async () => {
+      try {
+        const response = await fetch('/api/extensions');
+        if (!response.ok) {
+          throw new Error('Network response was not ok');
+        }
+        const data = await response.json();
+        setExtensions(data);
+      } catch (error) {
+        console.error("Failed to fetch extensions:", error);
+      }
+    };
+
+    fetchExtensions();
   }, []);
 
+  const categories = useMemo(() => {
+    const cats = ['All', ...new Set(extensions.map(ext => ext.category))];
+    return cats;
+  }, [extensions]);
+
   const filteredExtensions = useMemo(() => {
-    return EXTENSIONS.filter(ext => {
+    return extensions.filter(ext => {
       const matchesSearch = ext.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                             ext.shortDescription.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesCategory = activeCategory === 'All' || ext.category === activeCategory;
       return matchesSearch && matchesCategory;
     });
-  }, [searchQuery, activeCategory]);
+  }, [extensions, searchQuery, activeCategory]);
 
   return (
     <div className="animate-in fade-in duration-700">

@@ -64,7 +64,7 @@ app.post('/api/generate-content', async (req, res) => {
 
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
-    const prompt = `اكتب مقال SEO احترافي حول "${keyword}" بالعربية. التنسيق JSON: { "title": "...", "content": "...", "excerpt": "...", "readTime": "..." }`;
+    const prompt = `Write a professional SEO article about "${keyword}" in English. The format should be JSON: { "title": "...", "content": "...", "excerpt": "...", "readTime": "..." }`;
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
@@ -85,7 +85,7 @@ app.post('/api/seo-audit', async (req, res) => {
 
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
-    const prompt = `أنت خبير SEO محترف. قم بتحليل هذا العنوان: "${title}" والمحتوى: "${content.substring(0, 1000)}". أعطني 3 نصائح محددة باللغة العربية لتحسين الترتيب في جوجل.`;
+    const prompt = `You are a professional SEO expert. Analyze this title: "${title}" and content: "${content.substring(0, 1000)}". Give me 3 specific tips in English to improve Google ranking.`;
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();

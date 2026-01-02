@@ -1,6 +1,12 @@
 
 import React, { useState } from 'react';
-import { BRAND_LINKS } from '../constants';
+
+// Define BRAND_LINKS locally since constants file was removed
+const BRAND_LINKS = {
+  mainSite: 'https://extensionto.com',
+  twitter: 'https://x.com/extensionto',
+  github: 'https://github.com/extensionto',
+};
 
 interface LayoutProps {
   children: React.ReactNode;
