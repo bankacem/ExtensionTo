@@ -10,16 +10,11 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPage }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const isCms = currentPage === 'cms';
 
   const navLinks = [
     { label: 'Home', hash: '#home' },
     { label: 'Blog', hash: '#blog' },
   ];
-
-  if (currentPage === 'cms') {
-    return <div className="min-h-screen bg-[#F7F9FA]">{children}</div>;
-  }
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -72,7 +67,6 @@ const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPage }) =>
               <button key={link.hash} onClick={() => { onNavigate(link.hash); setIsMobileMenuOpen(false); }} className="text-left font-bold text-gray-900">{link.label}</button>
             ))}
             <a href={BRAND_LINKS.mainSite} className="font-bold text-blue-600">Main Site ↗</a>
-            <button onClick={() => { onNavigate('#cms'); setIsMobileMenuOpen(false); }} className="text-left font-bold text-gray-400">CMS Login</button>
           </div>
         )}
       </header>
@@ -94,7 +88,6 @@ const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPage }) =>
             <ul className="space-y-2">
               <li><button onClick={() => onNavigate('#home')} className="hover:text-blue-600">Browse Store</button></li>
               <li><button onClick={() => onNavigate('#blog')} className="hover:text-blue-600">Latest News</button></li>
-              <li><button onClick={() => onNavigate('#cms')} className="text-blue-600 font-bold text-[10px] uppercase tracking-widest mt-2 border border-blue-200 px-2 py-1 rounded hover:bg-blue-50 transition-all">Admin Console</button></li>
             </ul>
           </div>
           <div>

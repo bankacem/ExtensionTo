@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-// Fix: Removed conflicting Blob import from @google/genai to avoid shadowing browser's global Blob type
+// Import GoogleGenAI and Type from SDK
 import { GoogleGenAI, Type } from "@google/genai";
 import { BatchItem } from '../types';
 
@@ -25,6 +25,7 @@ const BatchStudio: React.FC = () => {
   
   const activeItem = batch.find(i => i.id === activeId);
 
+  // Analysis function for processing extension screenshots
   const analyzeImage = async (id: string, base64: string) => {
     try {
       // Fix: Proper initialization of GoogleGenAI using Named Parameter
@@ -32,8 +33,8 @@ const BatchStudio: React.FC = () => {
       
       const base64Data = base64.includes(',') ? base64.split(',')[1] : base64;
 
-      // Fix: Cast imagePart as any to bypass SDK-global Blob type shadowing conflict
-      const imagePart: any = {
+      // Define image part using a direct object literal which matches SDK expectations
+      const imagePart = {
         inlineData: {
           mimeType: 'image/png',
           data: base64Data || ''
@@ -68,11 +69,11 @@ const BatchStudio: React.FC = () => {
         }
       });
 
-      // Use the safe getter provided by the SDK
+      // Fix: Safely access .text property from GenerateContentResponse
       const textOutput = response.text;
       if (!textOutput) throw new Error("No text response from AI");
       
-      /* Casting JSON.parse output to specific type to avoid 'unknown' assignment issues */
+      // Fix: Use explicit type assertion for JSON.parse result to prevent 'unknown' assignment issues
       const data = JSON.parse(textOutput) as {
         focalPoint: { x: number; y: number };
         description: string;
@@ -86,7 +87,8 @@ const BatchStudio: React.FC = () => {
   };
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []).slice(0, 10);
+    // Fix: Explicitly type files as File[] to prevent inference as any[]/unknown[] which causes errors when passed to FileReader
+    const files: File[] = Array.from(e.target.files ?? []).slice(0, 10);
     if (files.length === 0) return;
 
     const newItems: BatchItem[] = [];
@@ -110,7 +112,7 @@ const BatchStudio: React.FC = () => {
     for (const item of newItems) { await analyzeImage(item.id, item.originalImage); }
   };
 
-  const drawFrame = (img: HTMLImageElement, format: typeof OUTPUT_FORMATS[0], focalPoint: { x: number; y: number }, logoImg: HTMLImageElement | null): string => {
+  const drawFrame = (img: HTMLImageElement, format: { width: number; height: number; id: string }, focalPoint: { x: number; y: number }, logoImg: HTMLImageElement | null): string => {
     const canvas = document.createElement('canvas');
     canvas.width = format.width;
     canvas.height = format.height;
