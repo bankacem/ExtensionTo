@@ -26,7 +26,7 @@ const trackEvent = (type: 'view' | 'click' | 'install', metadata?: any) => {
     timestamp: new Date().toISOString(),
     ...metadata
   });
-  if (stats.length > 1000) stats.shift();
+  if (stats.length > 2000) stats.shift();
   localStorage.setItem('et_analytics', JSON.stringify(stats));
 };
 
@@ -34,26 +34,25 @@ const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<PageType>('home');
   const [selectedExtensionId, setSelectedExtensionId] = useState<string | null>(null);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
-  const [dynamicPosts, setDynamicPosts] = useState<BlogPost[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // دمج المقالات الثابتة مع المقالات المخزنة في CMS
-  // Added useMemo to the React import above to resolve the "Cannot find name 'useMemo'" error.
   const allPosts = useMemo(() => {
     const saved = localStorage.getItem('cms_blog_posts');
     const parsedSaved = saved ? JSON.parse(saved) : [];
     // نفضل المقالات من الـ CMS إذا كانت موجودة
     const combined = parsedSaved.length > 0 ? parsedSaved : STATIC_POSTS;
     return combined;
-  }, [currentPage]); // تحديث القائمة عند التنقل (مثلاً العودة من CMS)
+  }, [currentPage]); 
 
-  const visiblePosts = allPosts.filter((post: BlogPost) => {
-    if (!post.publishDate) return true;
-    return new Date(post.publishDate).getTime() <= Date.now();
-  });
+  const visiblePosts = useMemo(() => {
+    return allPosts.filter((post: BlogPost) => {
+      if (!post.publishDate) return true;
+      return new Date(post.publishDate).getTime() <= Date.now();
+    });
+  }, [allPosts]);
 
   useEffect(() => {
-    // محاكاة تحميل البيانات
     const timer = setTimeout(() => setIsLoading(false), 500);
     return () => clearTimeout(timer);
   }, []);
@@ -96,7 +95,7 @@ const App: React.FC = () => {
         updateSEO('Journal', 'Privacy news and expert guides.');
         setCurrentPage('blog');
       } else if (hash === '#cms') {
-        updateSEO('Admin Console', 'Professional Dashboard');
+        updateSEO('Command Center', 'Main Admin Dashboard');
         setCurrentPage('cms');
       } else if (hash === '#privacy') {
         updateSEO('Privacy Policy', 'Your data is yours.');
@@ -147,7 +146,7 @@ const App: React.FC = () => {
     );
   }
 
-  // إذا كان المستخدم في مسار الـ CMS، نعرض لوحة التحكم فقط دون الـ Layout العام للموقع
+  // إذا كان المستخدم في مسار الـ CMS، نعرض لوحة التحكم الموحدة فقط
   if (currentPage === 'cms') {
     return <AdminCMS />;
   }

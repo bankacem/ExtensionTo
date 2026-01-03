@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { BlogPost } from '../types';
+import { BlogPost, BatchItem } from '../types';
 import { BLOG_POSTS as STATIC_POSTS } from '../constants';
 import { GoogleGenAI } from "@google/genai";
 import { 
@@ -12,11 +12,12 @@ import {
   Tooltip, 
   ResponsiveContainer
 } from 'recharts';
+import BatchStudio from './BatchStudio';
 
-type AdminView = 'dashboard' | 'articles' | 'write';
+type AdminTab = 'overview' | 'blog' | 'editor' | 'studio' | 'settings';
 
 const AdminCMS: React.FC = () => {
-  const [view, setView] = useState<AdminView>('dashboard');
+  const [activeTab, setActiveTab] = useState<AdminTab>('overview');
   const [blogItems, setBlogItems] = useState<BlogPost[]>(() => {
     const saved = localStorage.getItem('cms_blog_posts');
     return saved ? JSON.parse(saved) : STATIC_POSTS;
@@ -25,29 +26,36 @@ const AdminCMS: React.FC = () => {
   const [currentEditItem, setCurrentEditItem] = useState<Partial<BlogPost> | null>(null);
   const [aiStatus, setAiStatus] = useState({ loading: false, message: '' });
   const [analytics, setAnalytics] = useState<any[]>([]);
+  const [siteSettings, setSiteSettings] = useState(() => {
+    const saved = localStorage.getItem('et_site_settings');
+    return saved ? JSON.parse(saved) : {
+      siteName: 'ExtensionTo',
+      description: 'The ultimate directory for browser extensions.',
+      contactEmail: 'contact@extensionto.com'
+    };
+  });
 
   useEffect(() => {
     const data = JSON.parse(localStorage.getItem('et_analytics') || '[]');
     setAnalytics(data);
     localStorage.setItem('cms_blog_posts', JSON.stringify(blogItems));
-  }, [blogItems]);
+    localStorage.setItem('et_site_settings', JSON.stringify(siteSettings));
+  }, [blogItems, siteSettings]);
 
   const stats = useMemo(() => ({
     views: analytics.filter(e => e.type === 'view').length,
     installs: analytics.filter(e => e.type === 'install').length,
-    posts: blogItems.length
+    posts: blogItems.length,
+    clicks: analytics.filter(e => e.type === 'click').length
   }), [analytics, blogItems]);
 
   const chartData = useMemo(() => {
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    return days.map(day => ({ name: day, views: Math.floor(Math.random() * 500) + 100 }));
+    return days.map(day => ({ name: day, views: Math.floor(Math.random() * 400) + 100, installs: Math.floor(Math.random() * 50) }));
   }, []);
 
-  const handleSave = () => {
-    if (!currentEditItem?.title) {
-        alert("Please enter a title first.");
-        return;
-    }
+  const handleSavePost = () => {
+    if (!currentEditItem?.title) return;
     const newItem: BlogPost = {
       id: currentEditItem.id || `post-${Date.now()}`,
       title: currentEditItem.title || '',
@@ -66,111 +74,109 @@ const AdminCMS: React.FC = () => {
     else updated.unshift(newItem);
 
     setBlogItems(updated);
-    setView('articles');
-    alert("Article Published Successfully!");
+    setActiveTab('blog');
   };
 
   const generateWithGemini = async () => {
-    if (!currentEditItem?.title) {
-        alert("Enter a topic in the title field first!");
-        return;
-    }
-    setAiStatus({ loading: true, message: 'Gemini is researching and writing your post...' });
-    
+    if (!currentEditItem?.title) return;
+    setAiStatus({ loading: true, message: 'Gemini is drafting your content...' });
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const response = await ai.models.generateContent({
         model: 'gemini-3-pro-preview',
-        contents: `Write a high-quality, professional tech blog post for a Chrome Extension hub about: "${currentEditItem.title}". 
-        The post must be in valid HTML format (use <h2>, <p>, <ul>, <li>). 
-        Make it SEO friendly. 
-        Return ONLY a JSON object: { "excerpt": "brief summary", "content": "html body content", "category": "Security/Productivity/Guides" }`,
+        contents: `Create a professional tech post about: "${currentEditItem.title}". Return JSON: { "excerpt": "summary", "content": "html", "category": "Security" }`,
         config: { responseMimeType: "application/json" }
       });
-
       const result = JSON.parse(response.text || '{}');
-      setCurrentEditItem(prev => ({
-        ...prev,
-        excerpt: result.excerpt,
-        content: result.content,
-        category: result.category
-      }));
-      setAiStatus({ loading: false, message: 'Article drafted successfully!' });
+      setCurrentEditItem(prev => ({ ...prev, ...result }));
+      setAiStatus({ loading: false, message: 'Draft ready!' });
     } catch (e) {
-      console.error(e);
-      setAiStatus({ loading: false, message: 'AI failed. Check connection or API key.' });
+      setAiStatus({ loading: false, message: 'AI Error. Check key.' });
     }
   };
 
   return (
-    <div className="flex min-h-screen bg-[#F8FAFC] text-slate-900 font-sans selection:bg-blue-100" dir="ltr">
-      {/* Sidebar */}
-      <aside className="w-72 bg-[#0F172A] text-white flex flex-col fixed h-full z-50">
-        <div className="p-10 border-b border-white/5 flex items-center gap-4">
-          <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center font-black shadow-lg shadow-blue-500/30">CMS</div>
-          <span className="font-bold text-xl tracking-tight">Publisher</span>
+    <div className="flex min-h-screen bg-[#0F172A] text-white font-sans selection:bg-blue-500/30" dir="ltr">
+      {/* Sidebar Navigation */}
+      <aside className="w-72 bg-[#1E293B] flex flex-col fixed h-full border-r border-white/5 z-50">
+        <div className="p-8 border-b border-white/5 flex items-center gap-4">
+          <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center font-black shadow-lg shadow-blue-500/20">ET</div>
+          <span className="font-bold text-lg tracking-tight">Main Admin</span>
         </div>
         
-        <nav className="flex-grow p-6 space-y-2 mt-4">
-          <button onClick={() => setView('dashboard')} className={`w-full flex items-center gap-4 px-4 py-4 rounded-2xl transition-all font-bold text-sm ${view === 'dashboard' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-slate-400 hover:bg-white/5'}`}>
-            <span className="text-xl">📊</span> Dashboard
-          </button>
-          <button onClick={() => setView('articles')} className={`w-full flex items-center gap-4 px-4 py-4 rounded-2xl transition-all font-bold text-sm ${view === 'articles' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-slate-400 hover:bg-white/5'}`}>
-            <span className="text-xl">📄</span> Content Library
-          </button>
-          <button onClick={() => { setCurrentEditItem({ title: '', content: '', category: 'Guides', image: '' }); setView('write'); }} className={`w-full flex items-center gap-4 px-4 py-4 rounded-2xl transition-all font-bold text-sm ${view === 'write' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-slate-400 hover:bg-white/5'}`}>
-            <span className="text-xl">✍️</span> Create Post
-          </button>
+        <nav className="flex-grow p-6 space-y-1 mt-4">
+          {[
+            { id: 'overview', label: 'Overview', icon: '📊' },
+            { id: 'blog', label: 'Journal Manager', icon: '📄' },
+            { id: 'studio', label: 'Batch Studio', icon: '📸' },
+            { id: 'settings', label: 'Site Settings', icon: '⚙️' },
+          ].map(tab => (
+            <button 
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as AdminTab)} 
+              className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all font-semibold text-sm ${activeTab === tab.id ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
+            >
+              <span className="text-lg">{tab.icon}</span> {tab.label}
+            </button>
+          ))}
+          <div className="pt-4 mt-4 border-t border-white/5">
+             <button onClick={() => { setCurrentEditItem({ title: '', content: '' }); setActiveTab('editor'); }} className="w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl bg-white/5 text-blue-400 hover:bg-blue-600 hover:text-white transition-all font-bold text-xs uppercase tracking-widest">
+                <span>+</span> New Article
+             </button>
+          </div>
         </nav>
 
-        <div className="p-8 border-t border-white/5">
-          <button onClick={() => window.location.hash = '#home'} className="w-full text-xs font-black text-slate-500 hover:text-white transition-all py-4 border border-white/10 rounded-2xl flex items-center justify-center gap-2">
-            <span>←</span> EXIT TO MAIN SITE
+        <div className="p-6 border-t border-white/5">
+          <button onClick={() => window.location.hash = '#home'} className="w-full text-[10px] font-black text-slate-500 hover:text-white transition-all py-3 border border-white/10 rounded-xl flex items-center justify-center gap-2 tracking-[0.2em]">
+            EXIT TO LIVE SITE
           </button>
         </div>
       </aside>
 
-      {/* Main Content */}
-      <main className="ml-72 flex-grow p-16 overflow-y-auto">
-        {view === 'dashboard' && (
-          <div className="max-w-6xl space-y-12 animate-in fade-in duration-700">
-            <header>
-              <h1 className="text-5xl font-black tracking-tighter mb-4">Command Center</h1>
-              <p className="text-slate-400 text-lg font-medium">Control your publishing empire from one screen.</p>
+      {/* Main Workspace */}
+      <main className="ml-72 flex-grow p-12 overflow-y-auto">
+        {activeTab === 'overview' && (
+          <div className="max-w-6xl space-y-12 animate-in fade-in duration-500">
+            <header className="flex justify-between items-end">
+              <div>
+                <h1 className="text-4xl font-black tracking-tight mb-2">Platform Status</h1>
+                <p className="text-slate-400 font-medium">Monitoring site-wide engagement and content health.</p>
+              </div>
+              <div className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 text-emerald-400 rounded-full text-[10px] font-black border border-emerald-500/20">
+                 <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span> SYSTEM ONLINE
+              </div>
             </header>
 
-            <div className="grid grid-cols-3 gap-10">
+            <div className="grid grid-cols-4 gap-6">
               {[
-                { label: 'Site Visits', value: stats.views, icon: '👁️', color: 'text-blue-600', bg: 'bg-blue-50' },
-                { label: 'Conversion Rate', value: stats.installs, icon: '📈', color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                { label: 'Total Articles', value: stats.posts, icon: '📑', color: 'text-slate-900', bg: 'bg-slate-50' }
+                { label: 'Views', value: stats.views, icon: '👁️', color: 'text-blue-400' },
+                { label: 'Installs', value: stats.installs, icon: '🚀', color: 'text-emerald-400' },
+                { label: 'Engagement', value: stats.clicks, icon: '🔥', color: 'text-orange-400' },
+                { label: 'Content', value: stats.posts, icon: '📄', color: 'text-purple-400' }
               ].map((s, i) => (
-                <div key={i} className={`p-10 rounded-[40px] border border-slate-100 shadow-sm hover:shadow-xl transition-all bg-white group`}>
-                  <div className="flex justify-between items-center mb-6">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{s.label}</span>
-                    <div className={`w-12 h-12 ${s.bg} rounded-2xl flex items-center justify-center text-xl`}>{s.icon}</div>
-                  </div>
-                  <div className={`text-5xl font-black tracking-tighter ${s.color}`}>{s.value}</div>
+                <div key={i} className="bg-[#1E293B] p-8 rounded-[32px] border border-white/5 hover:border-blue-500/30 transition-all">
+                  <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">{s.label}</div>
+                  <div className={`text-3xl font-black ${s.color}`}>{s.value}</div>
                 </div>
               ))}
             </div>
 
-            <div className="bg-white p-12 rounded-[56px] border border-slate-100 shadow-sm">
-              <h3 className="font-black text-xl mb-10">Performance Analytics</h3>
-              <div className="h-96">
+            <div className="bg-[#1E293B] p-10 rounded-[40px] border border-white/5 shadow-2xl">
+              <h3 className="font-bold text-lg mb-8 text-slate-300">Traffic Distribution</h3>
+              <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={chartData}>
                     <defs>
-                      <linearGradient id="colorViews" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#2563EB" stopOpacity={0.1}/>
-                        <stop offset="95%" stopColor="#2563EB" stopOpacity={0}/>
+                      <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} dy={10} style={{fontSize: '11px', fontWeight: 'bold', fill: '#94A3B8'}} />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#FFFFFF05" />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} style={{fontSize: '10px', fill: '#64748B'}} />
                     <YAxis hide />
-                    <Tooltip contentStyle={{borderRadius: '24px', border: 'none', boxShadow: '0 20px 50px rgba(0,0,0,0.1)'}} />
-                    <Area type="monotone" dataKey="views" stroke="#2563EB" strokeWidth={5} fillOpacity={1} fill="url(#colorViews)" />
+                    <Tooltip contentStyle={{background: '#1E293B', border: '1px solid #334155', borderRadius: '12px'}} />
+                    <Area type="monotone" dataKey="views" stroke="#3B82F6" strokeWidth={4} fill="url(#chartGradient)" />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -178,133 +184,119 @@ const AdminCMS: React.FC = () => {
           </div>
         )}
 
-        {view === 'articles' && (
+        {activeTab === 'blog' && (
           <div className="max-w-6xl animate-in fade-in duration-500">
-            <header className="flex justify-between items-end mb-16">
-              <div>
-                <h1 className="text-5xl font-black tracking-tighter mb-4">Journal Archive</h1>
-                <p className="text-slate-400 font-medium">Manage and optimize your published content.</p>
-              </div>
-              <button onClick={() => { setCurrentEditItem({ title: '', content: '', category: 'Guides' }); setView('write'); }} className="px-10 py-5 bg-blue-600 text-white rounded-[24px] font-black text-sm shadow-2xl shadow-blue-600/30 hover:scale-105 transition-all">
-                WRITE NEW ARTICLE
-              </button>
-            </header>
+             <header className="flex justify-between items-center mb-12">
+               <h1 className="text-4xl font-black tracking-tight">Content Inventory</h1>
+               <button onClick={() => { setCurrentEditItem({ title: '', content: '' }); setActiveTab('editor'); }} className="px-8 py-3.5 bg-blue-600 text-white rounded-2xl font-black text-xs shadow-lg hover:scale-105 transition-all">
+                  WRITE NEW ARTICLE
+               </button>
+             </header>
 
-            <div className="bg-white rounded-[48px] border border-slate-100 shadow-sm overflow-hidden">
-              <table className="w-full text-left">
-                <thead className="bg-slate-50/50 border-b border-slate-100">
-                  <tr className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
-                    <th className="px-12 py-7">Content Detail</th>
-                    <th className="px-12 py-7">Tag</th>
-                    <th className="px-12 py-7">Published</th>
-                    <th className="px-12 py-7 text-right">Settings</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {blogItems.map(post => (
-                    <tr key={post.id} className="group hover:bg-slate-50/30 transition-colors">
-                      <td className="px-12 py-8">
-                        <div className="flex items-center gap-6">
-                          <div className="w-16 h-16 rounded-[20px] overflow-hidden bg-slate-100 flex items-center justify-center text-3xl shadow-inner border border-slate-100">
+             <div className="bg-[#1E293B] rounded-[32px] border border-white/5 overflow-hidden">
+               <table className="w-full text-left">
+                 <thead className="bg-white/5">
+                   <tr className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">
+                     <th className="px-10 py-6">Article</th>
+                     <th className="px-10 py-6">Category</th>
+                     <th className="px-10 py-6 text-right">Settings</th>
+                   </tr>
+                 </thead>
+                 <tbody className="divide-y divide-white/5">
+                   {blogItems.map(post => (
+                     <tr key={post.id} className="hover:bg-white/5 transition-colors">
+                       <td className="px-10 py-6 flex items-center gap-4">
+                         <div className="w-10 h-10 rounded-lg bg-slate-800 overflow-hidden flex items-center justify-center text-xl">
                             {post.image.startsWith('http') ? <img src={post.image} className="w-full h-full object-cover" /> : post.image}
-                          </div>
-                          <div>
-                            <span className="font-black text-slate-900 group-hover:text-blue-600 transition-colors text-lg">{post.title}</span>
-                            <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-tighter">{post.readTime} • {post.id}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-12 py-8">
-                        <span className="px-4 py-1.5 bg-blue-50 text-blue-600 text-[10px] font-black uppercase rounded-full border border-blue-100">{post.category}</span>
-                      </td>
-                      <td className="px-12 py-8 text-xs font-black text-slate-400 uppercase tracking-widest">{post.date}</td>
-                      <td className="px-12 py-8 text-right space-x-6">
-                        <button onClick={() => { setCurrentEditItem(post); setView('write'); }} className="text-xs font-black text-blue-600 uppercase hover:underline">Edit</button>
-                        <button onClick={() => { if(confirm('Delete?')) setBlogItems(blogItems.filter(p => p.id !== post.id)); }} className="text-xs font-black text-red-500 uppercase hover:underline">Remove</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                         </div>
+                         <span className="font-bold text-slate-300">{post.title}</span>
+                       </td>
+                       <td className="px-10 py-6">
+                         <span className="px-3 py-1 bg-blue-500/10 text-blue-400 text-[10px] font-black uppercase rounded-full border border-blue-500/20">{post.category}</span>
+                       </td>
+                       <td className="px-10 py-6 text-right space-x-4">
+                         <button onClick={() => { setCurrentEditItem(post); setActiveTab('editor'); }} className="text-xs font-black text-blue-400 uppercase hover:underline">Edit</button>
+                         <button onClick={() => setBlogItems(blogItems.filter(p => p.id !== post.id))} className="text-xs font-black text-red-400 uppercase hover:underline">Delete</button>
+                       </td>
+                     </tr>
+                   ))}
+                 </tbody>
+               </table>
+             </div>
           </div>
         )}
 
-        {view === 'write' && (
-          <div className="max-w-7xl mx-auto animate-in slide-in-from-bottom-12 duration-700">
-            <header className="flex justify-between items-center mb-16">
-              <button onClick={() => setView('articles')} className="text-sm font-black text-slate-400 hover:text-slate-900 transition-colors flex items-center gap-2 group">
-                <span className="group-hover:-translate-x-1 transition-transform">←</span> BACK TO LIBRARY
-              </button>
-              <div className="flex gap-6">
-                <button 
-                    onClick={generateWithGemini} 
-                    disabled={aiStatus.loading || !currentEditItem?.title} 
-                    className="px-8 py-5 bg-indigo-600 text-white rounded-[24px] font-black text-xs shadow-xl shadow-indigo-600/20 disabled:opacity-50 flex items-center gap-3 hover:scale-105 transition-all"
-                >
-                  {aiStatus.loading ? (
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  ) : '🪄'} {aiStatus.loading ? 'AI IS DRAFTING...' : 'AI ASSISTANT'}
-                </button>
-                <button onClick={handleSave} className="px-12 py-5 bg-slate-900 text-white rounded-[24px] font-black text-xs shadow-2xl hover:bg-black transition-all hover:scale-105 active:scale-95">
-                  SAVE & PUBLISH
-                </button>
-              </div>
-            </header>
+        {activeTab === 'editor' && (
+          <div className="max-w-6xl animate-in slide-in-from-bottom-8 duration-500">
+             <header className="flex justify-between items-center mb-10">
+               <button onClick={() => setActiveTab('blog')} className="text-xs font-black text-slate-500 hover:text-white transition-colors">← CANCEL EDITING</button>
+               <div className="flex gap-4">
+                 <button onClick={generateWithGemini} disabled={aiStatus.loading || !currentEditItem?.title} className="px-6 py-3 bg-violet-600 rounded-xl text-[10px] font-black flex items-center gap-2">
+                   {aiStatus.loading ? '🧙‍♂️ WRITING...' : '🪄 GEMINI ASSIST'}
+                 </button>
+                 <button onClick={handleSavePost} className="px-10 py-3 bg-blue-600 rounded-xl text-[10px] font-black">
+                   PUBLISH POST
+                 </button>
+               </div>
+             </header>
 
-            {aiStatus.message && (
-              <div className="mb-10 p-6 bg-indigo-50 text-indigo-700 rounded-[32px] text-xs font-black border border-indigo-100 flex items-center gap-4 animate-in slide-in-from-top-4">
-                <span className="text-xl">✨</span> {aiStatus.message}
-              </div>
-            )}
+             <div className="grid grid-cols-12 gap-8">
+               <div className="col-span-8 space-y-6">
+                 <input 
+                   placeholder="Headline..." 
+                   className="w-full bg-transparent text-5xl font-black outline-none placeholder:text-slate-800"
+                   value={currentEditItem?.title}
+                   onChange={e => setCurrentEditItem({...currentEditItem, title: e.target.value})}
+                 />
+                 <textarea 
+                   placeholder="Write content (HTML supported)..." 
+                   className="w-full h-[600px] bg-white/5 rounded-[32px] p-10 text-lg font-medium outline-none resize-none"
+                   value={currentEditItem?.content}
+                   onChange={e => setCurrentEditItem({...currentEditItem, content: e.target.value})}
+                 />
+               </div>
+               <div className="col-span-4 space-y-6">
+                  <div className="bg-[#1E293B] p-8 rounded-[32px] border border-white/5 space-y-6">
+                    <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Post Metadata</h3>
+                    <input className="w-full p-4 bg-white/5 border border-white/10 rounded-xl text-xs" placeholder="Category" value={currentEditItem?.category} onChange={e => setCurrentEditItem({...currentEditItem, category: e.target.value})} />
+                    <input className="w-full p-4 bg-white/5 border border-white/10 rounded-xl text-xs" placeholder="Image URL" value={currentEditItem?.image} onChange={e => setCurrentEditItem({...currentEditItem, image: e.target.value})} />
+                    <textarea className="w-full p-4 bg-white/5 border border-white/10 rounded-xl text-xs h-32" placeholder="SEO Excerpt" value={currentEditItem?.excerpt} onChange={e => setCurrentEditItem({...currentEditItem, excerpt: e.target.value})} />
+                  </div>
+               </div>
+             </div>
+          </div>
+        )}
 
-            <div className="grid grid-cols-12 gap-12">
-              <div className="col-span-8 space-y-10">
-                <div className="bg-white p-16 rounded-[64px] border border-slate-100 shadow-sm space-y-12 min-h-[900px]">
-                  <input 
-                    placeholder="Article Headline..." 
-                    className="w-full text-6xl font-black tracking-tighter outline-none placeholder:text-slate-100 bg-transparent"
-                    value={currentEditItem?.title}
-                    onChange={e => setCurrentEditItem({...currentEditItem, title: e.target.value})}
-                  />
-                  <div className="h-px bg-slate-100 w-full"></div>
-                  <textarea 
-                    placeholder="Start your story... (HTML editor supported)" 
-                    className="w-full min-h-[700px] text-xl font-medium leading-[1.8] outline-none placeholder:text-slate-100 resize-none bg-transparent"
-                    value={currentEditItem?.content}
-                    onChange={e => setCurrentEditItem({...currentEditItem, content: e.target.value})}
-                  />
+        {activeTab === 'studio' && (
+           <div className="max-w-7xl animate-in fade-in duration-500">
+              <header className="mb-10">
+                <h1 className="text-4xl font-black tracking-tight mb-2">Batch Studio</h1>
+                <p className="text-slate-400 font-medium">Generate professional extension assets in bulk.</p>
+              </header>
+              <BatchStudio />
+           </div>
+        )}
+
+        {activeTab === 'settings' && (
+          <div className="max-w-2xl animate-in fade-in duration-500">
+             <h1 className="text-4xl font-black tracking-tight mb-8">Site Settings</h1>
+             <div className="bg-[#1E293B] p-10 rounded-[40px] border border-white/5 space-y-8">
+                <div className="space-y-4">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Global Site Name</label>
+                  <input className="w-full p-5 bg-white/5 border border-white/10 rounded-2xl font-bold" value={siteSettings.siteName} onChange={e => setSiteSettings({...siteSettings, siteName: e.target.value})} />
                 </div>
-              </div>
-
-              <div className="col-span-4 space-y-10">
-                <div className="bg-white p-12 rounded-[48px] border border-slate-100 shadow-sm space-y-10 sticky top-12">
-                  <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-50 pb-6">Post Meta</h3>
-                  
-                  <div className="space-y-4">
-                    <label className="text-[10px] font-black text-slate-500 uppercase px-1">Content Category</label>
-                    <input className="w-full p-5 bg-slate-50 border border-slate-100 rounded-[20px] font-bold text-sm focus:bg-white focus:ring-4 ring-blue-50 transition-all outline-none" value={currentEditItem?.category} onChange={e => setCurrentEditItem({...currentEditItem, category: e.target.value})} />
-                  </div>
-
-                  <div className="space-y-4">
-                    <label className="text-[10px] font-black text-slate-500 uppercase px-1">Featured Image URL</label>
-                    <input className="w-full p-5 bg-slate-50 border border-slate-100 rounded-[20px] font-bold text-sm focus:bg-white focus:ring-4 ring-blue-50 transition-all outline-none" value={currentEditItem?.image} onChange={e => setCurrentEditItem({...currentEditItem, image: e.target.value})} />
-                  </div>
-
-                  <div className="space-y-4">
-                    <label className="text-[10px] font-black text-slate-500 uppercase px-1">Search Excerpt</label>
-                    <textarea className="w-full p-5 bg-slate-50 border border-slate-100 rounded-[20px] font-medium text-xs h-40 resize-none focus:bg-white focus:ring-4 ring-blue-50 transition-all outline-none" value={currentEditItem?.excerpt} onChange={e => setCurrentEditItem({...currentEditItem, excerpt: e.target.value})} />
-                  </div>
-
-                  <div className="pt-6">
-                    <div className="p-8 bg-blue-600 rounded-[32px] text-white shadow-xl shadow-blue-500/20">
-                      <h4 className="font-black text-lg mb-2">Editor's Helper</h4>
-                      <p className="text-blue-100 text-xs font-medium leading-relaxed opacity-90">Type a title like "Best Security Tips" and use the AI Wizard to write the full post for you instantly.</p>
-                    </div>
-                  </div>
+                <div className="space-y-4">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Site Description (SEO)</label>
+                  <textarea className="w-full p-5 bg-white/5 border border-white/10 rounded-2xl h-32" value={siteSettings.description} onChange={e => setSiteSettings({...siteSettings, description: e.target.value})} />
                 </div>
-              </div>
-            </div>
+                <div className="space-y-4">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Support Email</label>
+                  <input className="w-full p-5 bg-white/5 border border-white/10 rounded-2xl font-bold" value={siteSettings.contactEmail} onChange={e => setSiteSettings({...siteSettings, contactEmail: e.target.value})} />
+                </div>
+                <button className="w-full py-5 bg-blue-600 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-blue-600/20" onClick={() => alert('Settings Saved to Cloud (Local)!')}>
+                  SAVE CONFIGURATION
+                </button>
+             </div>
           </div>
         )}
       </main>
