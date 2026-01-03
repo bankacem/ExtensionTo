@@ -21,10 +21,13 @@ export interface BlogPost {
   excerpt: string;
   content: string; // يدعم HTML
   category: string;
+  tags?: string;
   date: string; // للعرض النصي (مثلاً: 12 مايو)
   publishDate: string; // للجدولة (ISO format: 2024-05-12T10:00)
   readTime: string;
   image: string; // يمكن أن يكون رابط URL أو Emoji
+  featured?: boolean;
+  status?: 'draft' | 'published' | 'scheduled';
 }
 
 export type PageType = 
@@ -42,6 +45,8 @@ export type PageType =
   | 'report-abuse'
   | 'cms'
   | 'batch-studio';
+
+export type UserRole = 'admin' | 'editor' | 'viewer';
 
 export interface BatchItem {
   id: string;

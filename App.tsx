@@ -13,7 +13,7 @@ import Security from './pages/Security';
 import Contact from './pages/Contact';
 import Help from './pages/Help';
 import ReportAbuse from './pages/ReportAbuse';
-import AdminCMS from './pages/AdminCMS';
+import AdminCMS from './AdminCMS';
 import { EXTENSIONS as STATIC_EXTENSIONS, BLOG_POSTS as STATIC_POSTS } from './constants';
 import { PageType, BlogPost, Extension } from './types';
 
@@ -143,7 +143,7 @@ const App: React.FC = () => {
 
   // Handle Admin CMS Route Independently
   if (currentPage === 'cms') {
-    return <AdminCMS />;
+    return <AdminCMS onExit={() => navigateTo('#home')} />;
   }
 
   const selectedExtension = allExtensions.find((e: Extension) => e.id === selectedExtensionId);
