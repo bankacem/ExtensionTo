@@ -14,10 +14,10 @@ import Contact from './pages/Contact';
 import Help from './pages/Help';
 import ReportAbuse from './pages/ReportAbuse';
 import AdminCMS from './pages/AdminCMS';
-import { EXTENSIONS, BLOG_POSTS as STATIC_POSTS } from './constants';
-import { PageType, BlogPost } from './types';
+import { EXTENSIONS as STATIC_EXTENSIONS, BLOG_POSTS as STATIC_POSTS } from './constants';
+import { PageType, BlogPost, Extension } from './types';
 
-// Simple Tracking System
+// Tracking Engine
 const trackEvent = (type: 'view' | 'click' | 'install', metadata?: any) => {
   const stats = JSON.parse(localStorage.getItem('et_analytics') || '[]');
   stats.push({
@@ -26,7 +26,7 @@ const trackEvent = (type: 'view' | 'click' | 'install', metadata?: any) => {
     timestamp: new Date().toISOString(),
     ...metadata
   });
-  if (stats.length > 2000) stats.shift();
+  if (stats.length > 3000) stats.shift();
   localStorage.setItem('et_analytics', JSON.stringify(stats));
 };
 
@@ -36,14 +36,16 @@ const App: React.FC = () => {
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // دمج المقالات الثابتة مع المقالات المخزنة في CMS
+  // Dynamic Content Loading (Synchronized with AdminCMS)
   const allPosts = useMemo(() => {
     const saved = localStorage.getItem('cms_blog_posts');
-    const parsedSaved = saved ? JSON.parse(saved) : [];
-    // نفضل المقالات من الـ CMS إذا كانت موجودة
-    const combined = parsedSaved.length > 0 ? parsedSaved : STATIC_POSTS;
-    return combined;
+    return saved ? JSON.parse(saved) : STATIC_POSTS;
   }, [currentPage]); 
+
+  const allExtensions = useMemo(() => {
+    const saved = localStorage.getItem('cms_extensions');
+    return saved ? JSON.parse(saved) : STATIC_EXTENSIONS;
+  }, [currentPage]);
 
   const visiblePosts = useMemo(() => {
     return allPosts.filter((post: BlogPost) => {
@@ -53,13 +55,13 @@ const App: React.FC = () => {
   }, [allPosts]);
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 500);
+    const timer = setTimeout(() => setIsLoading(false), 800);
     return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
     const updateSEO = (title: string, description: string) => {
-      document.title = `${title} | ExtensionTo`;
+      document.title = `${title} | ExtensionTo Hub`;
       const metaDescription = document.querySelector('meta[name="description"]');
       if (metaDescription) {
         metaDescription.setAttribute('content', description);
@@ -68,12 +70,11 @@ const App: React.FC = () => {
 
     const handleHashChange = () => {
       const hash = window.location.hash || '#home';
-      
       trackEvent('view');
 
       if (hash.startsWith('#detail/')) {
         const id = hash.replace('#detail/', '');
-        const ext = EXTENSIONS.find(e => e.id === id);
+        const ext = allExtensions.find((e: Extension) => e.id === id);
         if (ext) {
           updateSEO(ext.name, ext.shortDescription);
           trackEvent('click', { itemId: id, category: 'extension' });
@@ -92,37 +93,31 @@ const App: React.FC = () => {
           window.location.hash = '#blog';
         }
       } else if (hash === '#blog') {
-        updateSEO('Journal', 'Privacy news and expert guides.');
+        updateSEO('Journal', 'Privacy news and expert guides for digital professionals.');
         setCurrentPage('blog');
       } else if (hash === '#cms') {
-        updateSEO('Command Center', 'Main Admin Dashboard');
+        updateSEO('Admin Console', 'System Command Center');
         setCurrentPage('cms');
       } else if (hash === '#privacy') {
-        updateSEO('Privacy Policy', 'Your data is yours.');
+        updateSEO('Privacy Policy', 'We value your data sovereignty.');
         setCurrentPage('privacy');
       } else if (hash === '#terms') {
-        updateSEO('Terms of Service', 'Usage guidelines.');
+        updateSEO('Terms of Service', 'Transparent usage guidelines.');
         setCurrentPage('terms');
       } else if (hash === '#features') {
-        updateSEO('Features', 'Why ExtensionTo.');
+        updateSEO('Excellence Standards', 'Why professionals choose us.');
         setCurrentPage('features');
       } else if (hash === '#contact') {
-        updateSEO('Contact', 'Get in touch.');
+        updateSEO('Contact Support', 'Human-to-human support.');
         setCurrentPage('contact');
       } else if (hash === '#help') {
-        updateSEO('Help Center', 'Guides and FAQ.');
+        updateSEO('Help Center', 'Extensive knowledge base.');
         setCurrentPage('help');
       } else if (hash === '#report-abuse') {
-        updateSEO('Report Abuse', 'Safety first.');
+        updateSEO('Safety First', 'Report malicious content.');
         setCurrentPage('report-abuse');
-      } else if (hash === '#compliance') {
-        updateSEO('Compliance', 'Regulatory standards.');
-        setCurrentPage('compliance');
-      } else if (hash === '#security') {
-        updateSEO('Security', 'Verification process.');
-        setCurrentPage('security');
       } else {
-        updateSEO('Home', 'Premium Browser Extensions Hub.');
+        updateSEO('Home', 'Premium, Privacy-Focused Browser Extensions Hub.');
         setCurrentPage('home');
       }
       window.scrollTo(0, 0);
@@ -132,7 +127,7 @@ const App: React.FC = () => {
     handleHashChange();
 
     return () => window.removeEventListener('hashchange', handleHashChange);
-  }, [visiblePosts]);
+  }, [visiblePosts, allExtensions]);
 
   const navigateTo = (hash: string) => {
     window.location.hash = hash;
@@ -140,28 +135,48 @@ const App: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+      <div className="min-h-screen flex items-center justify-center bg-[#020617]">
+        <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
 
-  // إذا كان المستخدم في مسار الـ CMS، نعرض لوحة التحكم الموحدة فقط
+  // Handle Admin CMS Route Independently
   if (currentPage === 'cms') {
     return <AdminCMS />;
   }
 
-  const selectedExtension = EXTENSIONS.find(e => e.id === selectedExtensionId);
+  const selectedExtension = allExtensions.find((e: Extension) => e.id === selectedExtensionId);
   const selectedPost = visiblePosts.find((p: BlogPost) => p.id === selectedPostId);
 
   return (
     <Layout onNavigate={navigateTo} currentPage={currentPage}>
-      {currentPage === 'home' && <Home onSelect={(id) => navigateTo(`#detail/${id}`)} />}
-      {currentPage === 'detail' && selectedExtension && <Detail extension={selectedExtension} onBack={() => navigateTo('#home')} />}
+      {currentPage === 'home' && (
+        <Home 
+          extensions={allExtensions} 
+          onSelect={(id) => navigateTo(`#detail/${id}`)} 
+        />
+      )}
+      {currentPage === 'detail' && selectedExtension && (
+        <Detail 
+          extension={selectedExtension} 
+          onBack={() => navigateTo('#home')} 
+        />
+      )}
+      {currentPage === 'blog' && (
+        <Blog 
+          posts={visiblePosts} 
+          onPostSelect={(id) => navigateTo(`#blog/${id}`)} 
+        />
+      )}
+      {currentPage === 'blog-post' && selectedPost && (
+        <BlogPostDetail 
+          post={selectedPost} 
+          onBack={() => navigateTo('#blog')} 
+        />
+      )}
       {currentPage === 'privacy' && <Privacy />}
       {currentPage === 'terms' && <Terms />}
-      {currentPage === 'blog' && <Blog posts={visiblePosts} onPostSelect={(id) => navigateTo(`#blog/${id}`)} />}
-      {currentPage === 'blog-post' && selectedPost && <BlogPostDetail post={selectedPost} onBack={() => navigateTo('#blog')} />}
       {currentPage === 'features' && <Features />}
       {currentPage === 'contact' && <Contact />}
       {currentPage === 'help' && <Help />}
