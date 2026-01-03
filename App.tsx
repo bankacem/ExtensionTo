@@ -45,13 +45,40 @@ const App: React.FC = () => {
   useEffect(() => {
     const fetchArticles = async () => {
       try {
-        const response = await fetch('./articles.json');
-        if (response.ok) {
-          const data = await response.json();
-          setDynamicPosts(Array.isArray(data) ? [...STATIC_POSTS, ...data] : STATIC_POSTS);
+        // 1. Load from Static constants
+        let allPosts = [...STATIC_POSTS];
+
+        // 2. Try to load from local JSON (if exists on Vercel)
+        try {
+          const response = await fetch('./articles.json');
+          if (response.ok) {
+            const jsonData = await response.json();
+            if (Array.isArray(jsonData)) {
+              allPosts = [...allPosts, ...jsonData];
+            }
+          }
+        } catch (e) { console.log("No articles.json found"); }
+
+        // 3. Load from Admin CMS (LocalStorage) - Priority for current user
+        const saved = localStorage.getItem('cms_blog_posts');
+        if (saved) {
+          const cmsData = JSON.parse(saved);
+          if (Array.isArray(cmsData)) {
+            // Replace static items with edited ones if IDs match, otherwise add new
+            cmsData.forEach((post: BlogPost) => {
+              const index = allPosts.findIndex(p => p.id === post.id);
+              if (index !== -1) {
+                allPosts[index] = post;
+              } else {
+                allPosts.push(post);
+              }
+            });
+          }
         }
+
+        setDynamicPosts(allPosts);
       } catch (error) {
-        console.log("Using static fallback content.");
+        console.log("Error loading articles:", error);
       } finally {
         setIsLoading(false);
       }
@@ -70,7 +97,7 @@ const App: React.FC = () => {
 
     const handleHashChange = () => {
       const hash = window.location.hash || '#home';
-      
+
       trackEvent('view');
 
       if (hash.startsWith('#detail/')) {
@@ -97,7 +124,7 @@ const App: React.FC = () => {
         updateSEO('Journal', 'Privacy news and expert guides.');
         setCurrentPage('blog');
       } else if (hash === '#cms') {
-        updateSEO('Writer Dashboard', 'Manage directory content.');
+        updateSEO('Admin Console', 'Professional Dashboard');
         setCurrentPage('cms');
       } else if (hash === '#privacy') {
         updateSEO('Privacy Policy', 'Your data is yours.');
@@ -149,11 +176,7 @@ const App: React.FC = () => {
   }
 
   if (currentPage === 'cms') {
-    return (
-      <Layout onNavigate={navigateTo} currentPage={currentPage}>
-        <AdminCMS />
-      </Layout>
-    );
+    return <AdminCMS />;
   }
 
   const selectedExtension = EXTENSIONS.find(e => e.id === selectedExtensionId);
