@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Layout from './components/Layout';
 import Home from './pages/Home';
 import Detail from './pages/Detail';
@@ -34,29 +34,28 @@ const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<PageType>('home');
   const [selectedExtensionId, setSelectedExtensionId] = useState<string | null>(null);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
-  const [dynamicPosts, setDynamicPosts] = useState<BlogPost[]>(STATIC_POSTS);
+  const [dynamicPosts, setDynamicPosts] = useState<BlogPost[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const visiblePosts = dynamicPosts.filter(post => {
+  // دمج المقالات الثابتة مع المقالات المخزنة في CMS
+  // Added useMemo to the React import above to resolve the "Cannot find name 'useMemo'" error.
+  const allPosts = useMemo(() => {
+    const saved = localStorage.getItem('cms_blog_posts');
+    const parsedSaved = saved ? JSON.parse(saved) : [];
+    // نفضل المقالات من الـ CMS إذا كانت موجودة
+    const combined = parsedSaved.length > 0 ? parsedSaved : STATIC_POSTS;
+    return combined;
+  }, [currentPage]); // تحديث القائمة عند التنقل (مثلاً العودة من CMS)
+
+  const visiblePosts = allPosts.filter((post: BlogPost) => {
     if (!post.publishDate) return true;
     return new Date(post.publishDate).getTime() <= Date.now();
   });
 
   useEffect(() => {
-    const fetchArticles = async () => {
-      try {
-        const response = await fetch('./articles.json');
-        if (response.ok) {
-          const data = await response.json();
-          setDynamicPosts(Array.isArray(data) ? [...STATIC_POSTS, ...data] : STATIC_POSTS);
-        }
-      } catch (error) {
-        console.log("Using static fallback content.");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchArticles();
+    // محاكاة تحميل البيانات
+    const timer = setTimeout(() => setIsLoading(false), 500);
+    return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -84,7 +83,7 @@ const App: React.FC = () => {
         setCurrentPage('detail');
       } else if (hash.startsWith('#blog/')) {
         const id = hash.replace('#blog/', '');
-        const post = visiblePosts.find(p => p.id === id);
+        const post = visiblePosts.find((p: BlogPost) => p.id === id);
         if (post) {
           updateSEO(post.title, post.excerpt);
           trackEvent('click', { itemId: id, category: 'blog' });
@@ -134,7 +133,7 @@ const App: React.FC = () => {
     handleHashChange();
 
     return () => window.removeEventListener('hashchange', handleHashChange);
-  }, [dynamicPosts, visiblePosts]);
+  }, [visiblePosts]);
 
   const navigateTo = (hash: string) => {
     window.location.hash = hash;
@@ -143,17 +142,18 @@ const App: React.FC = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+        <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
 
+  // إذا كان المستخدم في مسار الـ CMS، نعرض لوحة التحكم فقط دون الـ Layout العام للموقع
   if (currentPage === 'cms') {
     return <AdminCMS />;
   }
 
   const selectedExtension = EXTENSIONS.find(e => e.id === selectedExtensionId);
-  const selectedPost = visiblePosts.find(p => p.id === selectedPostId);
+  const selectedPost = visiblePosts.find((p: BlogPost) => p.id === selectedPostId);
 
   return (
     <Layout onNavigate={navigateTo} currentPage={currentPage}>

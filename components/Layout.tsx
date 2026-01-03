@@ -88,13 +88,15 @@ const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPage }) =>
             <ul className="space-y-2">
               <li><button onClick={() => onNavigate('#home')} className="hover:text-blue-600">Browse Store</button></li>
               <li><button onClick={() => onNavigate('#blog')} className="hover:text-blue-600">Latest News</button></li>
+              <li><button onClick={() => onNavigate('#features')} className="hover:text-blue-600">Features</button></li>
             </ul>
           </div>
           <div>
-            <h4 className="text-gray-900 font-bold mb-4">Support</h4>
+            <h4 className="text-gray-900 font-bold mb-4">Support & Admin</h4>
             <ul className="space-y-2">
               <li><button onClick={() => onNavigate('#help')} className="hover:text-blue-600">Help Center</button></li>
               <li><button onClick={() => onNavigate('#privacy')} className="hover:text-blue-600">Privacy</button></li>
+              <li><button onClick={() => onNavigate('#cms')} className="text-blue-600 font-bold hover:underline">Admin Console (CMS) ⚙️</button></li>
               <li><button onClick={() => onNavigate('#report-abuse')} className="hover:text-red-600">Report Issue</button></li>
             </ul>
           </div>

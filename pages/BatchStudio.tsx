@@ -28,7 +28,7 @@ const BatchStudio: React.FC = () => {
   // Analysis function for processing extension screenshots
   const analyzeImage = async (id: string, base64: string) => {
     try {
-      // Fix: Proper initialization of GoogleGenAI using Named Parameter
+      // Proper initialization of GoogleGenAI using Named Parameter
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
       const base64Data = base64.includes(',') ? base64.split(',')[1] : base64;
@@ -69,11 +69,11 @@ const BatchStudio: React.FC = () => {
         }
       });
 
-      // Fix: Safely access .text property from GenerateContentResponse
+      // Safely access .text property from GenerateContentResponse
       const textOutput = response.text;
       if (!textOutput) throw new Error("No text response from AI");
       
-      // Fix: Use explicit type assertion for JSON.parse result to prevent 'unknown' assignment issues
+      // Use explicit type assertion for JSON.parse result to prevent 'unknown' assignment issues
       const data = JSON.parse(textOutput) as {
         focalPoint: { x: number; y: number };
         description: string;
@@ -87,8 +87,8 @@ const BatchStudio: React.FC = () => {
   };
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Fix: Explicitly type files as File[] to prevent inference as any[]/unknown[] which causes errors when passed to FileReader
-    const files: File[] = Array.from(e.target.files ?? []).slice(0, 10);
+    // Fixed line 91: Explicitly cast Array.from result to File[] to prevent "Type 'unknown[]' is not assignable to type 'File[]'" error.
+    const files = Array.from(e.target.files ?? []).slice(0, 10) as File[];
     if (files.length === 0) return;
 
     const newItems: BatchItem[] = [];
@@ -204,7 +204,8 @@ const BatchStudio: React.FC = () => {
                setBatch(prev => prev.map(i => i.id === activeId ? { ...i, manualFocalPoint: { x, y } } : i));
             }}>
               <img src={activeItem?.originalImage} className="w-full h-full object-contain" />
-              <div className="absolute w-10 h-10 border-2 border-white rounded-full -translate-x-1/2 -translate-y-1/2 pointer-events-none" style={{ left: `${activeItem?.manualFocalPoint?.x ?? activeItem?.aiAnalysis?.focalPoint.x ?? 50}%`, top: `${activeItem?.manualFocalPoint?.y ?? activeItem?.aiAnalysis?.focalPoint.y ?? 50}%` }}></div>
+              {/* Added optional chaining to focalPoint access for safety. */}
+              <div className="absolute w-10 h-10 border-2 border-white rounded-full -translate-x-1/2 -translate-y-1/2 pointer-events-none" style={{ left: `${activeItem?.manualFocalPoint?.x ?? activeItem?.aiAnalysis?.focalPoint?.x ?? 50}%`, top: `${activeItem?.manualFocalPoint?.y ?? activeItem?.aiAnalysis?.focalPoint?.y ?? 50}%` }}></div>
             </div>
             <div className="flex gap-4 overflow-x-auto">
               {batch.map(item => (
