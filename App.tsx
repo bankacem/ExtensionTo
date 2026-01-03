@@ -54,7 +54,7 @@ const App: React.FC = () => {
   }, [allPosts]);
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 1000);
+    const timer = setTimeout(() => setIsLoading(false), 800);
     return () => clearTimeout(timer);
   }, []);
 
@@ -93,28 +93,28 @@ const App: React.FC = () => {
         updateSEO('The Journal', 'Professional browser extension guides and privacy news.');
         setCurrentPage('blog');
       } else if (hash === '#cms') {
-        updateSEO('System Command Center', 'Administrative dashboard.');
+        updateSEO('System Console', 'Administrative command center.');
         setCurrentPage('cms');
       } else if (hash === '#privacy') {
-        updateSEO('Privacy Policy', 'Our commitment to your security.');
+        updateSEO('Privacy Policy', 'Data sovereignty guidelines.');
         setCurrentPage('privacy');
       } else if (hash === '#terms') {
-        updateSEO('Terms of Service', 'Platform usage guidelines.');
+        updateSEO('Terms of Service', 'Platform usage standards.');
         setCurrentPage('terms');
       } else if (hash === '#features') {
-        updateSEO('Standard of Excellence', 'Why professionals choose ExtensionTo.');
+        updateSEO('Standard of Excellence', 'Why professionals choose our directory.');
         setCurrentPage('features');
       } else if (hash === '#contact') {
-        updateSEO('Contact Support', 'Human-to-human support.');
+        updateSEO('Contact', 'Get in touch with the ExtensionTo team.');
         setCurrentPage('contact');
       } else if (hash === '#help') {
-        updateSEO('Help Center', 'Extension knowledge base.');
+        updateSEO('Help Center', 'Knowledge base and FAQ.');
         setCurrentPage('help');
       } else if (hash === '#report-abuse') {
-        updateSEO('Safety First', 'Report malicious content.');
+        updateSEO('Report Abuse', 'Safety first protocol.');
         setCurrentPage('report-abuse');
       } else {
-        updateSEO('Premium Extensions', 'Curated, high-performance browser tools.');
+        updateSEO('Premium Extensions', 'Curated browser tools for professionals.');
         setCurrentPage('home');
       }
       window.scrollTo(0, 0);
@@ -133,11 +133,12 @@ const App: React.FC = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#020617]">
-        <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+        <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
 
+  // Handle Admin CMS Route Independently (No Layout)
   if (currentPage === 'cms') {
     return <AdminCMS onExit={() => navigateTo('#home')} />;
   }
