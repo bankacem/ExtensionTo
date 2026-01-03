@@ -1,6 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { GoogleGenAI, Type } from "@google/genai";
+/* Import Blob from @google/genai as per guidelines. Shadowing global Blob is intentional for SDK compatibility. */
+import { GoogleGenAI, Type, Blob } from "@google/genai";
 import { BatchItem } from '../types';
 
 const OUTPUT_FORMATS = [
@@ -24,7 +25,6 @@ const BatchStudio: React.FC = () => {
   
   const activeItem = batch.find(i => i.id === activeId);
 
-  // Fix: Explicitly cast inlineData to any to avoid conflict with global Blob type in current environment
   const analyzeImage = async (id: string, base64: string) => {
     try {
       const apiKey = process.env.API_KEY || "";
@@ -32,11 +32,19 @@ const BatchStudio: React.FC = () => {
       
       const base64Data = base64.includes(',') ? base64.split(',')[1] : base64;
 
+      /* Satisfy InlineDataPart structure using @google/genai Blob type directly */
+      const imagePart = {
+        inlineData: {
+          mimeType: 'image/png',
+          data: base64Data || ''
+        }
+      };
+
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: {
           parts: [
-            { inlineData: { mimeType: 'image/png', data: base64Data || '' } as any },
+            imagePart,
             { text: "Analyze this browser extension screenshot. Identify the primary UI element. Return JSON: { \"focalPoint\": { \"x\": 0-100, \"y\": 0-100 }, \"description\": \"...\" }" }
           ]
         },
@@ -60,9 +68,16 @@ const BatchStudio: React.FC = () => {
         }
       });
 
+      // Use the safe getter provided by the SDK
       const textOutput = response.text;
       if (!textOutput) throw new Error("No text response from AI");
-      const data = JSON.parse(textOutput);
+      
+      /* Casting JSON.parse output to specific type to avoid 'unknown' assignment issues */
+      const data = JSON.parse(textOutput) as {
+        focalPoint: { x: number; y: number };
+        description: string;
+      };
+      
       setBatch(prev => prev.map(item => item.id === id ? { ...item, aiAnalysis: data, status: 'ready' } : item));
     } catch (e) {
       console.error("AI Analysis failed:", e);
