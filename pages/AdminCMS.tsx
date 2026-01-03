@@ -1,8 +1,9 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { BlogPost, Extension } from '../types';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { BlogPost, Extension, BatchItem } from '../types';
 import { BLOG_POSTS as STATIC_POSTS, EXTENSIONS as STATIC_EXTENSIONS } from '../constants';
-import { GoogleGenAI } from "@google/genai";
+// Removed unused and conflicting Blob import from @google/genai
+import { GoogleGenAI, Type } from "@google/genai";
 import { 
   AreaChart, 
   Area, 
@@ -17,7 +18,7 @@ import {
 } from 'recharts';
 
 type ContentType = 'blog' | 'extension';
-type AdminView = 'dashboard' | 'list' | 'edit' | 'auto-gen' | 'keywords';
+type AdminView = 'dashboard' | 'list' | 'edit' | 'auto-gen' | 'keywords' | 'asset-studio';
 
 interface KeywordMetric {
   keyword: string;
@@ -27,6 +28,12 @@ interface KeywordMetric {
   volume: string;
   competition: 'Low' | 'Medium' | 'High';
 }
+
+const OUTPUT_FORMATS = [
+  { id: 'chrome-store', name: 'Chrome Store (16:9)', width: 1280, height: 720 },
+  { id: 'instagram-square', name: 'Promo Square (1:1)', width: 1080, height: 1080 },
+  { id: 'tiktok-reels', name: 'Reels / Stories (9:16)', width: 1080, height: 1920 },
+];
 
 const AdminCMS: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ContentType>('blog');
@@ -46,6 +53,19 @@ const AdminCMS: React.FC = () => {
   const [analyticsData, setAnalyticsData] = useState<any[]>([]);
   const [generatedImageBase64, setGeneratedImageBase64] = useState<string | null>(null);
   const [seoAuditResult, setSeoAuditResult] = useState<string | null>(null);
+
+  // Asset Studio State
+  const [batch, setBatch] = useState<BatchItem[]>([]);
+  const [activeBatchId, setActiveBatchId] = useState<string | null>(null);
+  const [globalLogo, setGlobalLogo] = useState<string | null>(null);
+  const [globalHeadline, setGlobalHeadline] = useState('');
+  const [brightness, setBrightness] = useState(100);
+  const [contrast, setContrast] = useState(100);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [progressMsg, setProgressMsg] = useState('');
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   const [trackedKeywords] = useState<KeywordMetric[]>([
     { keyword: 'best chrome extensions 2025', intent: 'Commercial', difficulty: 45, score: 88, volume: '12.5k', competition: 'High' },
@@ -100,7 +120,8 @@ const AdminCMS: React.FC = () => {
     if (!currentEditItem) return;
     setStatus({ loading: true, message: 'Analyzing content with AI... 🔍' });
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+      // Fix: Proper initialization of GoogleGenAI using Named Parameter
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `You are a professional SEO expert. Analyze this title: "${currentEditItem.title}" and content snippet: "${currentEditItem.content?.substring(0, 1000)}". Provide 3 specific tips in English to improve Google ranking.`
@@ -117,7 +138,8 @@ const AdminCMS: React.FC = () => {
     
     setStatus({ loading: true, message: 'Studying content strategy... 🤖' });
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+      // Fix: Proper initialization of GoogleGenAI using Named Parameter
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
       setStatus({ loading: true, message: 'Generating professional article... ✍️' });
       const textRes = await ai.models.generateContent({
@@ -140,7 +162,7 @@ const AdminCMS: React.FC = () => {
 
       if (imgResponse?.candidates?.[0]?.content?.parts) {
         for (const part of imgResponse.candidates[0].content.parts) {
-          if (part.inlineData?.data) {
+          if (part.inlineData) {
             setGeneratedImageBase64(`data:image/png;base64,${part.inlineData.data}`);
             break;
           }
@@ -178,6 +200,116 @@ const AdminCMS: React.FC = () => {
     setView('list');
   };
 
+  // Asset Studio Logic
+  const analyzeImage = async (id: string, base64: string) => {
+    try {
+      // Fix: Proper initialization of GoogleGenAI using Named Parameter
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const base64Data = base64.includes(',') ? base64.split(',')[1] : base64;
+      // Fix: Cast imagePart as any to bypass SDK-global Blob type shadowing conflict
+      const imagePart: any = { inlineData: { mimeType: 'image/png', data: base64Data || '' } };
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: {
+          parts: [
+            imagePart,
+            { text: "Analyze this browser extension screenshot. Identify the primary UI element. Return JSON: { \"focalPoint\": { \"x\": 0-100, \"y\": 0-100 }, \"description\": \"...\" }" }
+          ]
+        },
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              focalPoint: {
+                type: Type.OBJECT,
+                properties: { x: { type: Type.NUMBER }, y: { type: Type.NUMBER } },
+                required: ['x', 'y']
+              },
+              description: { type: Type.STRING }
+            },
+            required: ['focalPoint', 'description']
+          }
+        }
+      });
+      const data = JSON.parse(response.text || '{}') as any;
+      setBatch(prev => prev.map(item => item.id === id ? { ...item, aiAnalysis: data, status: 'ready' } : item));
+    } catch (e) {
+      setBatch(prev => prev.map(item => item.id === id ? { ...item, status: 'error' } : item));
+    }
+  };
+
+  const handleBatchUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []).slice(0, 10);
+    const newItems: BatchItem[] = [];
+    for (const file of files) {
+      const base64 = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => resolve(ev.target?.result as string);
+        reader.readAsDataURL(file);
+      });
+      const id = Math.random().toString(36).substr(2, 9);
+      newItems.push({ id, originalImage: base64, aiAnalysis: null, manualFocalPoint: null, status: 'analyzing' });
+    }
+    setBatch(prev => [...prev, ...newItems]);
+    if (!activeBatchId && newItems.length > 0) setActiveBatchId(newItems[0].id);
+    for (const item of newItems) { await analyzeImage(item.id, item.originalImage); }
+  };
+
+  const drawFrame = (img: HTMLImageElement, format: typeof OUTPUT_FORMATS[0], focalPoint: { x: number; y: number }, logoImg: HTMLImageElement | null): string => {
+    const canvas = document.createElement('canvas');
+    canvas.width = format.width;
+    canvas.height = format.height;
+    const ctx = canvas.getContext('2d')!;
+    const targetAspect = format.width / format.height;
+    const sourceAspect = img.width / img.height;
+    let sx, sy, sw, sh;
+    if (sourceAspect > targetAspect) {
+      sh = img.height; sw = img.height * targetAspect; sy = 0;
+      sx = Math.max(0, Math.min(img.width - sw, (focalPoint.x / 100) * img.width - sw / 2));
+    } else {
+      sw = img.width; sh = img.width / targetAspect; sx = 0;
+      sy = Math.max(0, Math.min(img.height - sh, (focalPoint.y / 100) * img.height - sh / 2));
+    }
+    ctx.filter = `brightness(${brightness}%) contrast(${contrast}%)`;
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, format.width, format.height);
+    ctx.filter = 'none';
+    if (globalHeadline) {
+      ctx.font = `900 ${format.height * 0.07}px Inter, sans-serif`;
+      ctx.fillStyle = 'white'; ctx.textAlign = 'center'; ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 40;
+      ctx.fillText(globalHeadline.toUpperCase(), format.width / 2, format.height * 0.15);
+    }
+    if (logoImg) {
+      const lw = format.width * 0.12; const lh = (logoImg.height / logoImg.width) * lw;
+      ctx.globalAlpha = 0.9; ctx.drawImage(logoImg, format.width - lw - 40, format.height - lh - 40, lw, lh);
+    }
+    return canvas.toDataURL('image/jpeg', 0.92);
+  };
+
+  const exportAll = async () => {
+    setIsProcessing(true);
+    const logoImg = globalLogo ? await new Promise<HTMLImageElement>((resolve) => {
+      const i = new Image(); i.onload = () => resolve(i); i.src = globalLogo!;
+    }) : null;
+    for (let i = 0; i < batch.length; i++) {
+      const item = batch[i]; setProgressMsg(`Processing ${i + 1}/${batch.length}...`);
+      const img = await new Promise<HTMLImageElement>((resolve) => {
+        const o = new Image(); o.onload = () => resolve(o); o.src = item.originalImage;
+      });
+      const point = item.manualFocalPoint || item.aiAnalysis?.focalPoint || { x: 50, y: 50 };
+      for (const format of OUTPUT_FORMATS) {
+        const dataUrl = drawFrame(img, format, point, logoImg);
+        const link = document.createElement('a'); link.href = dataUrl;
+        link.download = `asset_${item.id.substr(0,4)}_${format.id}.jpg`;
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        await new Promise(r => setTimeout(r, 200));
+      }
+    }
+    setIsProcessing(false); setProgressMsg('');
+  };
+
+  const activeBatchItem = batch.find(i => i.id === activeBatchId);
+
   return (
     <div className="flex min-h-screen bg-[#F9FAFB] text-slate-900 font-sans" dir="ltr">
       {/* Sidebar */}
@@ -202,6 +334,11 @@ const AdminCMS: React.FC = () => {
           </button>
           <button onClick={() => {setActiveTab('extension'); setView('list');}} className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all font-bold text-sm ${activeTab === 'extension' && view === 'list' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-white/5'}`}>
              <span className="text-lg">🧩</span> Extensions
+          </button>
+
+          <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4 mt-8 px-4">Internal Tools</p>
+          <button onClick={() => setView('asset-studio')} className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all font-bold text-sm ${view === 'asset-studio' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-white/5'}`}>
+             <span className="text-lg">🎨</span> Asset Studio
           </button>
 
           <div className="absolute bottom-8 left-6 right-6">
@@ -294,6 +431,72 @@ const AdminCMS: React.FC = () => {
                   </div>
                </div>
             </div>
+          </div>
+        )}
+
+        {view === 'asset-studio' && (
+          <div className="max-w-6xl animate-in slide-in-from-bottom-4">
+             <header className="mb-10 flex justify-between items-center">
+                <div>
+                   <h1 className="text-4xl font-black text-slate-900 mb-2">Asset Studio</h1>
+                   <p className="text-slate-400 font-medium">Bulk process screenshots into promotional materials.</p>
+                </div>
+                <div className="flex gap-4">
+                   <button onClick={() => fileInputRef.current?.click()} className="bg-slate-950 text-white px-8 py-4 rounded-2xl font-black text-xs">UPLOAD SOURCE</button>
+                   {batch.length > 0 && <button onClick={exportAll} disabled={isProcessing} className="bg-blue-600 text-white px-8 py-4 rounded-2xl font-black text-xs">{isProcessing ? progressMsg : 'EXPORT ALL'}</button>}
+                </div>
+             </header>
+
+             <div className="grid grid-cols-12 gap-8">
+                <div className="col-span-8 space-y-8">
+                   <div className="bg-white p-2 rounded-[32px] border border-slate-100 shadow-sm relative aspect-video overflow-hidden group" onClick={(e) => {
+                       if (!activeBatchId) return;
+                       const rect = e.currentTarget.getBoundingClientRect();
+                       const x = ((e.clientX - rect.left) / rect.width) * 100;
+                       const y = ((e.clientY - rect.top) / rect.height) * 100;
+                       setBatch(prev => prev.map(i => i.id === activeBatchId ? { ...i, manualFocalPoint: { x, y } } : i));
+                   }}>
+                      {activeBatchItem ? (
+                        <>
+                          <img src={activeBatchItem.originalImage} className="w-full h-full object-contain" />
+                          <div className="absolute w-8 h-8 border-2 border-blue-600 bg-blue-500/10 rounded-full -translate-x-1/2 -translate-y-1/2 pointer-events-none shadow-xl" style={{ left: `${activeBatchItem.manualFocalPoint?.x ?? activeBatchItem.aiAnalysis?.focalPoint.x ?? 50}%`, top: `${activeBatchItem.manualFocalPoint?.y ?? activeBatchItem.aiAnalysis?.focalPoint.y ?? 50}%` }}></div>
+                        </>
+                      ) : (
+                        <div className="h-full flex items-center justify-center text-slate-300 font-bold">Select an image to edit</div>
+                      )}
+                   </div>
+                   <div className="flex gap-4 overflow-x-auto pb-4">
+                      {batch.map(item => (
+                        <div key={item.id} onClick={() => setActiveBatchId(item.id)} className={`w-24 aspect-square rounded-2xl overflow-hidden cursor-pointer border-2 flex-shrink-0 transition-all ${activeBatchId === item.id ? 'border-blue-600 shadow-lg' : 'border-transparent opacity-60'}`}>
+                           <img src={item.originalImage} className="w-full h-full object-cover" />
+                        </div>
+                      ))}
+                   </div>
+                </div>
+
+                <div className="col-span-4 space-y-6">
+                   <div className="bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm space-y-6">
+                      <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">Appearance</h3>
+                      <input type="text" placeholder="Global Headline..." className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl font-bold outline-none focus:bg-white" value={globalHeadline} onChange={e => setGlobalHeadline(e.target.value)} />
+                      <button onClick={() => logoInputRef.current?.click()} className="w-full py-6 border-2 border-dashed border-slate-100 rounded-2xl text-[10px] font-black text-slate-400 hover:border-blue-200 hover:text-blue-500 transition-all">
+                         {globalLogo ? <img src={globalLogo} className="h-8 mx-auto" /> : 'UPLOAD BRAND LOGO'}
+                      </button>
+                   </div>
+                   <div className="bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm space-y-6">
+                      <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">Enhancements</h3>
+                      <div className="space-y-4">
+                         <div className="flex justify-between text-[10px] font-black"><label>BRIGHTNESS</label><span>{brightness}%</span></div>
+                         <input type="range" min="50" max="150" value={brightness} onChange={e => setBrightness(parseInt(e.target.value))} className="w-full accent-blue-600" />
+                      </div>
+                      <div className="space-y-4">
+                         <div className="flex justify-between text-[10px] font-black"><label>CONTRAST</label><span>{contrast}%</span></div>
+                         <input type="range" min="50" max="150" value={contrast} onChange={e => setContrast(parseInt(e.target.value))} className="w-full accent-blue-600" />
+                      </div>
+                   </div>
+                </div>
+             </div>
+             <input type="file" ref={fileInputRef} onChange={handleBatchUpload} className="hidden" accept="image/*" multiple />
+             <input type="file" ref={logoInputRef} onChange={e => { const f = e.target.files?.[0]; if (f) { const r = new FileReader(); r.onload = (ev) => setGlobalLogo(ev.target?.result as string); r.readAsDataURL(f); } }} className="hidden" accept="image/*" />
           </div>
         )}
 

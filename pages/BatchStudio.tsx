@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-/* Import Blob from @google/genai as per guidelines. Shadowing global Blob is intentional for SDK compatibility. */
-import { GoogleGenAI, Type, Blob } from "@google/genai";
+// Fix: Removed conflicting Blob import from @google/genai to avoid shadowing browser's global Blob type
+import { GoogleGenAI, Type } from "@google/genai";
 import { BatchItem } from '../types';
 
 const OUTPUT_FORMATS = [
@@ -27,13 +27,13 @@ const BatchStudio: React.FC = () => {
 
   const analyzeImage = async (id: string, base64: string) => {
     try {
-      const apiKey = process.env.API_KEY || "";
-      const ai = new GoogleGenAI({ apiKey });
+      // Fix: Proper initialization of GoogleGenAI using Named Parameter
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
       const base64Data = base64.includes(',') ? base64.split(',')[1] : base64;
 
-      /* Satisfy InlineDataPart structure using @google/genai Blob type directly */
-      const imagePart = {
+      // Fix: Cast imagePart as any to bypass SDK-global Blob type shadowing conflict
+      const imagePart: any = {
         inlineData: {
           mimeType: 'image/png',
           data: base64Data || ''

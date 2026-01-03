@@ -14,11 +14,10 @@ import Contact from './pages/Contact';
 import Help from './pages/Help';
 import ReportAbuse from './pages/ReportAbuse';
 import AdminCMS from './pages/AdminCMS';
-import BatchStudio from './pages/BatchStudio';
 import { EXTENSIONS, BLOG_POSTS as STATIC_POSTS } from './constants';
 import { PageType, BlogPost } from './types';
 
-// نظام التتبع البسيط
+// Simple Tracking System
 const trackEvent = (type: 'view' | 'click' | 'install', metadata?: any) => {
   const stats = JSON.parse(localStorage.getItem('et_analytics') || '[]');
   stats.push({
@@ -27,7 +26,6 @@ const trackEvent = (type: 'view' | 'click' | 'install', metadata?: any) => {
     timestamp: new Date().toISOString(),
     ...metadata
   });
-  // الاحتفاظ بآخر 1000 حدث فقط لتوفير المساحة
   if (stats.length > 1000) stats.shift();
   localStorage.setItem('et_analytics', JSON.stringify(stats));
 };
@@ -73,7 +71,6 @@ const App: React.FC = () => {
     const handleHashChange = () => {
       const hash = window.location.hash || '#home';
       
-      // تسجيل زيارة الصفحة
       trackEvent('view');
 
       if (hash.startsWith('#detail/')) {
@@ -102,9 +99,6 @@ const App: React.FC = () => {
       } else if (hash === '#cms') {
         updateSEO('Writer Dashboard', 'Manage directory content.');
         setCurrentPage('cms');
-      } else if (hash === '#batch-studio') {
-        updateSEO('Batch Asset Studio', 'Bulk image processing for extensions.');
-        setCurrentPage('batch-studio');
       } else if (hash === '#privacy') {
         updateSEO('Privacy Policy', 'Your data is yours.');
         setCurrentPage('privacy');
@@ -179,7 +173,6 @@ const App: React.FC = () => {
       {currentPage === 'report-abuse' && <ReportAbuse />}
       {currentPage === 'compliance' && <Compliance />}
       {currentPage === 'security' && <Security />}
-      {currentPage === 'batch-studio' && <BatchStudio />}
     </Layout>
   );
 };

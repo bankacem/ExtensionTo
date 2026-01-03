@@ -10,11 +10,10 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPage }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const isCms = currentPage === 'cms' || currentPage === 'batch-studio';
+  const isCms = currentPage === 'cms';
 
   const navLinks = [
     { label: 'Home', hash: '#home' },
-    { label: 'Asset Studio', hash: '#batch-studio' },
     { label: 'Blog', hash: '#blog' },
   ];
 
@@ -94,7 +93,6 @@ const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPage }) =>
             <h4 className="text-gray-900 font-bold mb-4">Quick Links</h4>
             <ul className="space-y-2">
               <li><button onClick={() => onNavigate('#home')} className="hover:text-blue-600">Browse Store</button></li>
-              <li><button onClick={() => onNavigate('#batch-studio')} className="hover:text-blue-600">Asset Studio</button></li>
               <li><button onClick={() => onNavigate('#blog')} className="hover:text-blue-600">Latest News</button></li>
               <li><button onClick={() => onNavigate('#cms')} className="text-blue-600 font-bold text-[10px] uppercase tracking-widest mt-2 border border-blue-200 px-2 py-1 rounded hover:bg-blue-50 transition-all">Admin Console</button></li>
             </ul>
