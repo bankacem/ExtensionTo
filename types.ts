@@ -19,15 +19,18 @@ export interface BlogPost {
   id: string;
   title: string;
   excerpt: string;
-  content: string; // يدعم HTML
+  content: string; // Supports HTML
   category: string;
   tags?: string;
-  date: string; // للعرض النصي (مثلاً: 12 مايو)
-  publishDate: string; // للجدولة (ISO format: 2024-05-12T10:00)
+  date: string; // Display date
+  publishDate: string; // ISO format for scheduling
   readTime: string;
-  image: string; // يمكن أن يكون رابط URL أو Emoji
+  image: string; // URL or Emoji
   featured?: boolean;
   status?: 'draft' | 'published' | 'scheduled';
+  seoTitle?: string;
+  seoDesc?: string;
+  seoKeywords?: string;
 }
 
 export type PageType = 

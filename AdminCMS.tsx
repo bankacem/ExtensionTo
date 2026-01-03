@@ -1,58 +1,95 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { BlogPost, Extension, UserRole } from './types';
-import { GoogleGenAI } from "@google/genai";
-import BatchStudio from './pages/BatchStudio';
+import { BLOG_POSTS as STATIC_POSTS, EXTENSIONS as STATIC_EXTENSIONS } from './constants';
+import { GoogleGenAI, Type } from "@google/genai";
+import { 
+  LineChart, 
+  Line, 
+  XAxis, 
+  YAxis, 
+  Tooltip as ChartTooltip, 
+  ResponsiveContainer,
+  CartesianGrid 
+} from 'recharts';
 
 interface AdminCMSProps {
   onExit?: () => void;
 }
 
+// Fixed line 20: Defined MediaItem interface to provide type safety for the media library state and avoid 'unknown' errors
+interface MediaItem {
+  id: string;
+  name: string;
+  data: string;
+  type: string;
+}
+
 type NoticeType = 'success' | 'error' | 'info';
-type Tab = 'dashboard' | 'posts' | 'extensions' | 'media' | 'studio' | 'settings';
+type Tab = 'dashboard' | 'posts' | 'extensions' | 'media' | 'analytics' | 'settings';
+type PostStatus = 'draft' | 'published' | 'scheduled';
 
 const AUTH_KEY = 'cms_auth_token';
 const USERS_KEY = 'cms_users';
 const MEDIA_KEY = 'cms_media';
-const VERSIONS_KEY = 'cms_versions';
+const POSTS_KEY = 'cms_blog_posts';
+const EXTS_KEY = 'cms_extensions';
+const ANALYTICS_KEY = 'cms_analytics_log';
 
 const DEFAULT_USERS = [
   { id: '1', username: 'admin', password: 'admin123', role: 'admin' as UserRole },
   { id: '2', username: 'editor', password: 'editor123', role: 'editor' as UserRole },
+  { id: '3', username: 'viewer', password: 'viewer123', role: 'viewer' as UserRole },
 ];
 
 const AdminCMS: React.FC<AdminCMSProps> = ({ onExit }) => {
-  // Navigation & UI State
+  // Navigation & Auth State
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [currentUser, setCurrentUser] = useState<{ username: string; role: UserRole } | null>(null);
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [darkMode, setDarkMode] = useState(false);
   const [notice, setNotice] = useState<{ message: string; type: NoticeType } | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editType, setEditType] = useState<'post' | 'extension'>('post');
-  
+
   // Data State
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [extensions, setExtensions] = useState<Extension[]>([]);
-  const [mediaLibrary, setMediaLibrary] = useState<any[]>([]);
+  // Fixed line 55: Properly typed mediaLibrary state using the MediaItem interface to resolve 'Property ... does not exist on type unknown' errors
+  const [mediaLibrary, setMediaLibrary] = useState<MediaItem[]>([]);
+  const [analytics, setAnalytics] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  
-  // Form State
-  const [postForm, setPostForm] = useState<Partial<BlogPost>>({});
-  const [extForm, setExtForm] = useState<Partial<Extension>>({});
-  const [aiLoading, setAiLoading] = useState(false);
 
+  // Editor State
+  const [isEditing, setIsEditing] = useState(false);
+  const [editMode, setEditMode] = useState<'post' | 'extension'>('post');
+  const [formData, setFormData] = useState<any>({});
+  const [aiLoading, setAiLoading] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Initialize Data
   useEffect(() => {
-    // Init data
-    if (!localStorage.getItem(USERS_KEY)) localStorage.setItem(USERS_KEY, JSON.stringify(DEFAULT_USERS));
     const auth = localStorage.getItem(AUTH_KEY);
     if (auth) setCurrentUser(JSON.parse(auth));
-    
-    setPosts(JSON.parse(localStorage.getItem('cms_blog_posts') || '[]'));
-    setExtensions(JSON.parse(localStorage.getItem('cms_extensions') || '[]'));
-    setMediaLibrary(JSON.parse(localStorage.getItem(MEDIA_KEY) || '[]'));
+    if (!localStorage.getItem(USERS_KEY)) localStorage.setItem(USERS_KEY, JSON.stringify(DEFAULT_USERS));
+
+    const savedPosts = localStorage.getItem(POSTS_KEY);
+    setPosts(savedPosts ? JSON.parse(savedPosts) : STATIC_POSTS);
+
+    const savedExts = localStorage.getItem(EXTS_KEY);
+    setExtensions(savedExts ? JSON.parse(savedExts) : STATIC_EXTENSIONS);
+
+    // Fixed line 81: Explicitly cast parsed localStorage data to MediaItem[] to ensure type safety
+    setMediaLibrary(JSON.parse(localStorage.getItem(MEDIA_KEY) || '[]') as MediaItem[]);
+    setAnalytics(JSON.parse(localStorage.getItem(ANALYTICS_KEY) || '[]'));
     setDarkMode(localStorage.getItem('cms_dark_mode') === 'true');
   }, []);
+
+  // Save State
+  useEffect(() => {
+    if (posts.length > 0) localStorage.setItem(POSTS_KEY, JSON.stringify(posts));
+    if (extensions.length > 0) localStorage.setItem(EXTS_KEY, JSON.stringify(extensions));
+  }, [posts, extensions]);
 
   const showNotice = (message: string, type: NoticeType = 'info') => {
     setNotice({ message, type });
@@ -67,7 +104,7 @@ const AdminCMS: React.FC<AdminCMSProps> = ({ onExit }) => {
       const authData = { username: user.username, role: user.role };
       setCurrentUser(authData);
       localStorage.setItem(AUTH_KEY, JSON.stringify(authData));
-      showNotice(`Welcome back, ${user.username}`, 'success');
+      showNotice(`Logged in as ${user.username}`, 'success');
     } else {
       showNotice('Invalid credentials', 'error');
     }
@@ -76,269 +113,408 @@ const AdminCMS: React.FC<AdminCMSProps> = ({ onExit }) => {
   const handleLogout = () => {
     localStorage.removeItem(AUTH_KEY);
     setCurrentUser(null);
-    onExit?.();
+    showNotice('Logged out', 'info');
   };
 
-  const savePosts = (newPosts: BlogPost[]) => {
-    setPosts(newPosts);
-    localStorage.setItem('cms_blog_posts', JSON.stringify(newPosts));
-  };
-
-  const saveExtensions = (newExts: Extension[]) => {
-    setExtensions(newExts);
-    localStorage.setItem('cms_extensions', JSON.stringify(newExts));
-  };
-
-  // AI Content Generator
-  const generatePostDraft = async () => {
-    if (!postForm.title) return showNotice('Please enter a title first', 'info');
+  // AI Assistant using Gemini
+  const generateAIDraft = async () => {
+    if (!formData.title) return showNotice('Please enter a title first', 'info');
     setAiLoading(true);
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const response = await ai.models.generateContent({
         model: 'gemini-3-pro-preview',
-        contents: `Create a professional blog post in HTML format for: "${postForm.title}". Include <h2> and <p> tags. Also provide a 1-sentence excerpt. Return JSON: { "content": "...", "excerpt": "..." }`,
-        config: { responseMimeType: "application/json" }
+        contents: `Write a professional blog post about "${formData.title}" suitable for a high-end tech directory. 
+                  Format the response as HTML using <h2>, <p>, and <ul> tags. 
+                  Also, provide a short 150-character summary.
+                  Return strictly in JSON format: { "content": "HTML_STRING", "excerpt": "SUMMARY_STRING" }`,
+        config: { 
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              content: { type: Type.STRING },
+              excerpt: { type: Type.STRING }
+            },
+            required: ['content', 'excerpt']
+          }
+        }
       });
-      const data = JSON.parse(response.text);
-      setPostForm(prev => ({ ...prev, content: data.content, excerpt: data.excerpt }));
+      
+      const text = response.text;
+      if (!text) throw new Error("Empty response");
+      const data = JSON.parse(text);
+      setFormData({ ...formData, content: data.content, excerpt: data.excerpt });
       showNotice('AI Draft Generated!', 'success');
     } catch (e) {
-      showNotice('AI Generation Failed', 'error');
+      console.error(e);
+      showNotice('AI Assistant failed to generate draft', 'error');
     } finally {
       setAiLoading(false);
     }
   };
 
-  const handleSavePost = () => {
-    if (!postForm.title) return;
-    const newPost: BlogPost = {
-      id: postForm.id || postForm.title.toLowerCase().replace(/\s+/g, '-'),
-      title: postForm.title,
-      excerpt: postForm.excerpt || '',
-      content: postForm.content || '',
-      category: postForm.category || 'General',
-      date: postForm.date || new Date().toLocaleDateString(),
-      publishDate: postForm.publishDate || new Date().toISOString(),
-      readTime: postForm.readTime || '5 min read',
-      image: postForm.image || 'https://images.unsplash.com/photo-1496065187959-7f07b8353c55',
-      status: postForm.status || 'published'
-    };
-    const updated = [...posts];
-    const idx = updated.findIndex(p => p.id === newPost.id);
-    if (idx > -1) updated[idx] = newPost; else updated.unshift(newPost);
-    savePosts(updated);
-    setIsEditing(false);
-    showNotice('Post Saved', 'success');
+  // SEO Booster Logic
+  const boostSEO = () => {
+    const title = formData.title || '';
+    const plainContent = (formData.content || '').replace(/<[^>]*>/g, '');
+    const desc = (formData.excerpt || plainContent).slice(0, 155);
+    const keywords = (formData.category || 'chrome, extension, privacy').toLowerCase();
+    
+    setFormData({
+      ...formData,
+      seoTitle: title.slice(0, 60),
+      seoDesc: desc,
+      seoKeywords: keywords
+    });
+    showNotice('SEO Metadata Boosted!', 'success');
   };
 
-  const handleSaveExtension = () => {
-    if (!extForm.name) return;
-    const newExt: Extension = {
-      id: extForm.id || extForm.name.toLowerCase().replace(/\s+/g, '-'),
-      name: extForm.name,
-      shortDescription: extForm.shortDescription || '',
-      longDescription: extForm.longDescription || '',
-      icon: extForm.icon || '🛠️',
-      rating: extForm.rating || 5.0,
-      users: extForm.users || '10K+',
-      category: extForm.category || 'Utility',
-      features: extForm.features || [],
-      version: extForm.version || '1.0.0',
-      lastUpdated: new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
-      size: extForm.size || '1.0MB',
-      storeUrl: extForm.storeUrl || '#'
-    };
-    const updated = [...extensions];
-    const idx = updated.findIndex(e => e.id === newExt.id);
-    if (idx > -1) updated[idx] = newExt; else updated.unshift(newExt);
-    saveExtensions(updated);
-    setIsEditing(false);
-    showNotice('Extension Saved', 'success');
+  // Fixed line 161: Added the missing handleExport function and fixed the Blob usage to resolve 'Argument of type unknown is not assignable to parameter of type Blob' error
+  const handleExport = () => {
+    const data = { posts, extensions };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `extensionto_backup_${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showNotice('Site backup exported!', 'success');
   };
 
-  // UI Components
+  // CRUD Operations
+  const handleSave = () => {
+    if (editMode === 'post') {
+      const newPost: BlogPost = {
+        ...formData,
+        id: formData.id || formData.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+        date: formData.date || new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+        publishDate: formData.publishDate || new Date().toISOString(),
+        readTime: formData.readTime || '5 min read',
+        image: formData.image || 'https://images.unsplash.com/photo-1496065187959-7f07b8353c55',
+        status: formData.status || 'published'
+      };
+      const updated = [...posts];
+      const idx = updated.findIndex(p => p.id === newPost.id);
+      if (idx > -1) updated[idx] = newPost; else updated.unshift(newPost);
+      setPosts(updated);
+    } else {
+      const newExt: Extension = {
+        ...formData,
+        id: formData.id || formData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+        lastUpdated: new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+      };
+      const updated = [...extensions];
+      const idx = updated.findIndex(e => e.id === newExt.id);
+      if (idx > -1) updated[idx] = newExt; else updated.unshift(newExt);
+      setExtensions(updated);
+    }
+    setIsEditing(false);
+    showNotice('All changes saved', 'success');
+  };
+
+  const handleMediaUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    Array.from(files).forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        // Fixed line 208: Properly typing the new media item to maintain consistency in mediaLibrary
+        const item: MediaItem = { 
+          id: Date.now().toString() + Math.random().toString(36).substr(2, 5), 
+          name: file.name, 
+          data: ev.target?.result as string, 
+          type: file.type 
+        };
+        const updated = [item, ...mediaLibrary];
+        setMediaLibrary(updated);
+        localStorage.setItem(MEDIA_KEY, JSON.stringify(updated));
+      };
+      reader.readAsDataURL(file);
+    });
+    showNotice('Media added to library', 'success');
+  };
+
+  // Dashboard Stats
+  const dashboardStats = useMemo(() => {
+    const chartData = [
+      { name: 'Mon', views: 1200, installs: 340 },
+      { name: 'Tue', views: 1500, installs: 410 },
+      { name: 'Wed', views: 2100, installs: 520 },
+      { name: 'Thu', views: 1800, installs: 390 },
+      { name: 'Fri', views: 2400, installs: 610 },
+      { name: 'Sat', views: 2800, installs: 720 },
+      { name: 'Sun', views: 3200, installs: 850 },
+    ];
+    return {
+      postsCount: posts.length,
+      extsCount: extensions.length,
+      totalViews: '24.8K',
+      totalInstalls: '5.2K',
+      chartData
+    };
+  }, [posts, extensions]);
+
+  const bgClass = darkMode ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-900';
+  const cardClass = darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200';
+  const inputClass = darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300';
+
   if (!currentUser) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 font-sans">
-        <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-10 border border-slate-100">
-          <div className="flex justify-center mb-8">
-            <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black text-2xl shadow-xl shadow-blue-200">ET</div>
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6 font-sans">
+        <div className="w-full max-w-md bg-white rounded-[48px] shadow-2xl p-12 border border-slate-200/50">
+          <div className="flex justify-center mb-10">
+            <div className="w-16 h-16 bg-indigo-600 rounded-3xl flex items-center justify-center text-white font-black text-2xl shadow-xl shadow-indigo-100">E</div>
           </div>
-          <h1 className="text-2xl font-black text-slate-900 text-center mb-2">ExtensionTo Admin</h1>
-          <p className="text-slate-500 text-center mb-8 font-medium">Please sign in to your dashboard</p>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <input type="text" placeholder="Username" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-4 ring-blue-50 font-medium" value={loginForm.username} onChange={e => setLoginForm({...loginForm, username: e.target.value})} />
-            <input type="password" placeholder="Password" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-4 ring-blue-50 font-medium" value={loginForm.password} onChange={e => setLoginForm({...loginForm, password: e.target.value})} />
-            <button className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all">SIGN IN</button>
+          <h1 className="text-3xl font-black text-slate-900 text-center mb-2">ExtensionTo CMS</h1>
+          <p className="text-slate-500 text-center mb-10 font-medium">Please sign in to continue</p>
+          <form onSubmit={handleLogin} className="space-y-6">
+            <div>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2 mb-2 block">Username</label>
+              <input type="text" className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-4 ring-indigo-50 font-bold transition-all" value={loginForm.username} onChange={e => setLoginForm({...loginForm, username: e.target.value})} required />
+            </div>
+            <div>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2 mb-2 block">Password</label>
+              <input type="password" className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-4 ring-indigo-50 font-bold transition-all" value={loginForm.password} onChange={e => setLoginForm({...loginForm, password: e.target.value})} required />
+            </div>
+            <button className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-[0.98]">AUTHENTICATE</button>
           </form>
-          <p className="mt-8 text-xs text-center text-slate-400 font-bold uppercase tracking-widest">Demo: admin / admin123</p>
+          <p className="mt-8 text-[10px] text-center text-slate-300 font-black uppercase tracking-[0.2em]">DEMO: admin / admin123</p>
         </div>
       </div>
     );
   }
 
-  const filteredPosts = posts.filter(p => p.title.toLowerCase().includes(searchTerm.toLowerCase()));
-  const filteredExts = extensions.filter(e => e.name.toLowerCase().includes(searchTerm.toLowerCase()));
-
   return (
-    <div className={`min-h-screen flex ${darkMode ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-900'} font-sans`}>
+    <div className={`min-h-screen flex ${bgClass} font-sans transition-colors duration-500`}>
       {/* Sidebar */}
-      <aside className={`w-72 fixed h-full border-r ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} z-50 flex flex-col shadow-xl`}>
-        <div className="p-8 border-b border-inherit flex items-center gap-4">
-          <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-black">E</div>
-          <span className="font-bold text-lg tracking-tight">Main Admin</span>
+      <aside className={`w-80 fixed h-full border-r ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} z-50 flex flex-col shadow-2xl`}>
+        <div className="p-10 border-b border-inherit flex items-center gap-4">
+          <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-black shadow-lg shadow-indigo-200">E</div>
+          <div>
+            <span className="font-black text-lg tracking-tight block">Console</span>
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Enterprise Edition</span>
+          </div>
         </div>
-        <nav className="flex-grow p-6 space-y-1">
+        
+        <nav className="flex-grow p-6 space-y-2 overflow-y-auto">
           {[
-            { id: 'dashboard', label: 'Dashboard', icon: '📊' },
-            { id: 'posts', label: 'Journal Manager', icon: '📄' },
-            { id: 'extensions', label: 'Store Manager', icon: '🛍️' },
-            { id: 'media', label: 'Media Library', icon: '📁' },
-            { id: 'studio', label: 'Asset Studio', icon: '🎬' },
-            { id: 'settings', label: 'Settings', icon: '⚙️' },
+            { id: 'dashboard', label: 'Overview', icon: '💎' },
+            { id: 'posts', label: 'Journal Manager', icon: '📝' },
+            { id: 'extensions', label: 'Store Inventory', icon: '🛍️' },
+            { id: 'media', label: 'Media Assets', icon: '📁' },
+            { id: 'analytics', label: 'Traffic Intelligence', icon: '📊' },
+            { id: 'settings', label: 'System Settings', icon: '⚙️' },
           ].map(item => (
-            <button key={item.id} onClick={() => {setActiveTab(item.id as Tab); setIsEditing(false);}} className={`w-full text-left px-5 py-4 rounded-2xl flex items-center gap-4 font-bold text-sm transition-all ${activeTab === item.id ? 'bg-blue-600 text-white shadow-lg' : 'hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400'}`}>
-              <span className="text-lg">{item.icon}</span> {item.label}
+            <button 
+              key={item.id} 
+              onClick={() => {setActiveTab(item.id as Tab); setIsEditing(false);}} 
+              className={`w-full text-left px-6 py-5 rounded-2xl flex items-center gap-5 font-bold text-sm transition-all ${activeTab === item.id ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-200' : 'hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400'}`}
+            >
+              <span className="text-xl">{item.icon}</span> {item.label}
             </button>
           ))}
         </nav>
-        <div className="p-6 border-t border-inherit space-y-4">
-          <button onClick={() => { setDarkMode(!darkMode); localStorage.setItem('cms_dark_mode', String(!darkMode)); }} className="w-full py-3 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-blue-600 transition-colors">
-            {darkMode ? '☀️ LIGHT MODE' : '🌙 DARK MODE'}
+
+        <div className="p-8 border-t border-inherit space-y-4">
+          <button 
+            onClick={() => { setDarkMode(!darkMode); localStorage.setItem('cms_dark_mode', String(!darkMode)); }} 
+            className={`w-full py-4 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${darkMode ? 'bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500 hover:text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-900 hover:text-white'}`}
+          >
+            {darkMode ? '☀️ LIGHT INTERFACE' : '🌙 DARK INTERFACE'}
           </button>
-          <button onClick={handleLogout} className="w-full py-4 bg-red-50 text-red-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all">LOGOUT</button>
+          <button onClick={handleLogout} className="w-full py-4 bg-rose-50 text-rose-600 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-rose-600 hover:text-white transition-all">LOGOUT</button>
         </div>
       </aside>
 
       {/* Main Workspace */}
-      <main className="ml-72 flex-grow p-12 overflow-y-auto">
-        {notice && <div className={`fixed top-8 right-8 z-[100] px-8 py-4 rounded-2xl shadow-2xl text-white font-black animate-bounce ${notice.type === 'success' ? 'bg-emerald-500' : 'bg-rose-500'}`}>{notice.message}</div>}
+      <main className="ml-80 flex-grow p-12 overflow-y-auto">
+        {notice && (
+          <div className={`fixed top-12 right-12 z-[100] px-10 py-5 rounded-[24px] shadow-2xl text-white font-black animate-in slide-in-from-top-12 duration-500 ${notice.type === 'success' ? 'bg-emerald-500' : 'bg-rose-500'}`}>
+            {notice.message}
+          </div>
+        )}
 
         {activeTab === 'dashboard' && (
-          <div className="space-y-12 animate-in fade-in duration-500">
-            <header>
-              <h1 className="text-4xl font-black mb-2">Hello, {currentUser.username} 👋</h1>
-              <p className="text-slate-500 font-medium">Here's what's happening on ExtensionTo Hub.</p>
+          <div className="space-y-12 animate-in fade-in duration-700">
+            <header className="flex justify-between items-end">
+              <div>
+                <h1 className="text-6xl font-black tracking-tighter mb-4">Command Center</h1>
+                <p className="text-slate-500 text-xl font-medium">Platform performance & management.</p>
+              </div>
+              <div className="flex gap-4">
+                 <button onClick={() => {setEditMode('post'); setFormData({title: '', content: ''}); setIsEditing(true);}} className="px-8 py-5 bg-indigo-600 text-white rounded-[24px) font-black text-sm shadow-2xl shadow-indigo-200 hover:bg-indigo-700 transition-all active:scale-95">NEW POST</button>
+              </div>
             </header>
+
             <div className="grid grid-cols-4 gap-8">
               {[
-                { label: 'Total Posts', val: posts.length, color: 'text-blue-600' },
-                { label: 'Extensions', val: extensions.length, color: 'text-emerald-600' },
-                { label: 'Views (24h)', val: '1.2K', color: 'text-indigo-600' },
-                { label: 'Installs', val: '432', color: 'text-rose-600' },
+                { label: 'Weekly Views', val: dashboardStats.totalViews, icon: '👁️', color: 'text-indigo-600' },
+                { label: 'Journal Entries', val: dashboardStats.postsCount, icon: '📄', color: 'text-blue-600' },
+                { label: 'Store Items', val: dashboardStats.extsCount, icon: '📦', color: 'text-emerald-600' },
+                { label: 'Total Installs', val: dashboardStats.totalInstalls, icon: '🚀', color: 'text-rose-600' },
               ].map((s, i) => (
-                <div key={i} className={`p-8 rounded-[32px] border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'} shadow-sm`}>
-                  <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">{s.label}</div>
-                  <div className={`text-4xl font-black ${s.color}`}>{s.val}</div>
+                <div key={i} className={`p-10 rounded-[48px] border shadow-sm group hover:scale-105 transition-all ${cardClass}`}>
+                  <div className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 mb-4">{s.label}</div>
+                  <div className="flex items-center justify-between">
+                    <div className={`text-5xl font-black ${s.color} tracking-tighter`}>{s.val}</div>
+                    <div className="text-4xl opacity-20 group-hover:opacity-100 transition-opacity">{s.icon}</div>
+                  </div>
                 </div>
               ))}
             </div>
-            <div className="flex gap-4">
-               <button onClick={() => {setEditType('post'); setPostForm({title: '', content: ''}); setIsEditing(true);}} className="px-8 py-4 bg-blue-600 text-white rounded-2xl font-black text-sm shadow-xl shadow-blue-200">WRITE NEW ARTICLE</button>
-               <button onClick={() => {setEditType('extension'); setExtForm({name: ''}); setIsEditing(true);}} className="px-8 py-4 bg-white border border-slate-200 text-slate-900 rounded-2xl font-black text-sm shadow-sm">ADD EXTENSION</button>
+
+            <div className={`p-12 rounded-[64px] border shadow-2xl ${cardClass}`}>
+              <h3 className="text-2xl font-black mb-12 flex items-center gap-3">
+                <span className="w-2 h-8 bg-indigo-600 rounded-full"></span>
+                Growth Projection
+              </h3>
+              <div className="h-[400px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={dashboardStats.chartData}>
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12, fontWeight: 700}} />
+                    <YAxis hide />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={darkMode ? '#334155' : '#f1f5f9'} />
+                    <ChartTooltip contentStyle={{borderRadius: '24px', border: 'none', boxShadow: '0 25px 50px rgba(0,0,0,0.1)', fontWeight: 800}} />
+                    <Line type="monotone" dataKey="views" stroke="#4f46e5" strokeWidth={6} dot={false} />
+                    <Line type="monotone" dataKey="installs" stroke="#10b981" strokeWidth={6} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           </div>
         )}
 
         {activeTab === 'posts' && !isEditing && (
-          <div className="space-y-8 animate-in fade-in duration-500">
-            <header className="flex justify-between items-center">
-              <h2 className="text-3xl font-black">Journal Manager</h2>
-              <button onClick={() => {setEditType('post'); setPostForm({title: ''}); setIsEditing(true);}} className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold text-sm">New Post</button>
-            </header>
-            <input type="text" placeholder="Search posts..." className={`w-full p-4 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-            <div className="space-y-4">
-              {filteredPosts.map(p => (
-                <div key={p.id} className={`p-6 rounded-2xl border flex items-center justify-between ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'} group`}>
-                  <div className="flex items-center gap-6">
-                    <img src={p.image} className="w-16 h-16 rounded-xl object-cover" />
-                    <div>
-                      <div className="font-bold text-lg">{p.title}</div>
-                      <div className="text-xs text-slate-500 font-bold uppercase tracking-widest">{p.category} • {p.date}</div>
+          <div className="space-y-12 animate-in slide-in-from-right-12 duration-500">
+             <header className="flex justify-between items-center">
+               <h2 className="text-5xl font-black tracking-tighter">Journal Content</h2>
+               <div className="flex gap-4">
+                 <input type="text" placeholder="Search entries..." className={`px-6 py-4 rounded-2xl border outline-none focus:ring-4 ring-indigo-50 font-bold ${inputClass}`} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                 <button onClick={() => {setEditMode('post'); setFormData({title: ''}); setIsEditing(true);}} className="px-10 py-5 bg-indigo-600 text-white rounded-[24px] font-black text-sm shadow-xl shadow-indigo-100">CREATE ENTRY</button>
+               </div>
+             </header>
+
+             <div className="grid grid-cols-2 gap-8">
+               {posts.filter(p => p.title.toLowerCase().includes(searchTerm.toLowerCase())).map(post => (
+                 <div key={post.id} className={`p-8 rounded-[48px] border shadow-sm flex gap-8 group transition-all hover:border-indigo-500/30 ${cardClass}`}>
+                    <div className="w-40 h-40 rounded-[32px] overflow-hidden flex-shrink-0 border border-inherit bg-slate-50">
+                      {post.image.startsWith('http') ? <img src={post.image} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-6xl">{post.image}</div>}
                     </div>
-                  </div>
-                  <div className="flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => {setPostForm(p); setEditType('post'); setIsEditing(true);}} className="text-blue-600 font-bold text-xs">EDIT</button>
-                    <button onClick={() => savePosts(posts.filter(item => item.id !== p.id))} className="text-rose-500 font-bold text-xs">DELETE</button>
-                  </div>
+                    <div className="flex flex-col justify-between flex-grow">
+                       <div>
+                          <div className="flex justify-between">
+                            <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-2">{post.category}</span>
+                            <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${post.status === 'published' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-amber-500/10 text-amber-600'}`}>{post.status}</span>
+                          </div>
+                          <h3 className="text-2xl font-black leading-tight group-hover:text-indigo-600 transition-colors line-clamp-2">{post.title}</h3>
+                       </div>
+                       <div className="flex justify-between items-center">
+                          <span className="text-xs font-bold text-slate-400">{post.date}</span>
+                          <div className="flex gap-4">
+                             <button onClick={() => {setFormData(post); setEditMode('post'); setIsEditing(true);}} className="text-[10px] font-black text-slate-400 hover:text-indigo-600 uppercase tracking-widest transition-colors">Edit</button>
+                             <button onClick={() => setPosts(posts.filter(p => p.id !== post.id))} className="text-[10px] font-black text-rose-500 hover:text-rose-600 uppercase tracking-widest transition-colors">Delete</button>
+                          </div>
+                       </div>
+                    </div>
+                 </div>
+               ))}
+             </div>
+          </div>
+        )}
+
+        {isEditing && (
+          <div className="max-w-6xl animate-in slide-in-from-bottom-12 duration-700">
+            <header className="flex justify-between items-center mb-12">
+               <button onClick={() => setIsEditing(false)} className="text-sm font-black text-slate-400 hover:text-indigo-600 transition-colors flex items-center gap-3">
+                  <span className="text-xl">←</span> DISCARD
+               </button>
+               <div className="flex gap-4">
+                  {editMode === 'post' && (
+                    <>
+                      <button onClick={generateAIDraft} disabled={aiLoading} className="px-8 py-4 bg-violet-600 text-white rounded-[20px] font-black text-xs shadow-xl shadow-violet-100 flex items-center gap-3 hover:scale-105 transition-all">
+                        {aiLoading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : '🪄'} AI ASSISTANT
+                      </button>
+                      <button onClick={boostSEO} className="px-8 py-4 bg-emerald-600 text-white rounded-[20px] font-black text-xs shadow-xl shadow-emerald-100 hover:scale-105 transition-all">🚀 BOOST SEO</button>
+                    </>
+                  )}
+                  <button onClick={handleSave} className="px-12 py-5 bg-indigo-600 text-white rounded-[24px] font-black text-sm shadow-2xl shadow-indigo-200 active:scale-[0.98]">SAVE CHANGES</button>
+               </div>
+            </header>
+
+            <div className={`p-16 rounded-[64px] border shadow-2xl space-y-12 ${cardClass}`}>
+              <div className="space-y-4">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Primary Descriptor</label>
+                <input 
+                  className="w-full bg-transparent text-6xl font-black outline-none placeholder:text-slate-200 tracking-tighter" 
+                  placeholder={editMode === 'post' ? "Article Title..." : "Extension Name..."}
+                  value={editMode === 'post' ? formData.title : formData.name}
+                  onChange={e => setFormData(editMode === 'post' ? {...formData, title: e.target.value} : {...formData, name: e.target.value})}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-12">
+                 <div className="space-y-8">
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Classification</label>
+                      <input className={`w-full p-6 rounded-[24px] border font-bold ${inputClass}`} value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} />
+                    </div>
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Asset Reference (URL/Emoji)</label>
+                      <input className={`w-full p-6 rounded-[24px] border font-bold ${inputClass}`} value={editMode === 'post' ? formData.image : formData.icon} onChange={e => setFormData(editMode === 'post' ? {...formData, image: e.target.value} : {...formData, icon: e.target.value})} />
+                    </div>
+                 </div>
+                 <div className="space-y-8">
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Search Metadata</label>
+                      <textarea className={`w-full p-6 rounded-[24px] border font-medium text-sm h-32 leading-relaxed ${inputClass}`} placeholder="SEO Keywords / Description..." value={formData.seoDesc} onChange={e => setFormData({...formData, seoDesc: e.target.value})} />
+                    </div>
+                 </div>
+              </div>
+
+              <div className="space-y-4">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Article Body (HTML Supported)</label>
+                <textarea 
+                  className={`w-full h-[600px] p-10 rounded-[48px] border font-medium text-lg leading-[1.8] outline-none ${inputClass}`} 
+                  placeholder="Begin writing..."
+                  value={editMode === 'post' ? formData.content : formData.longDescription}
+                  onChange={e => setFormData(editMode === 'post' ? {...formData, content: e.target.value} : {...formData, longDescription: e.target.value})}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'media' && (
+          <div className="space-y-12 animate-in fade-in duration-500">
+            <header className="flex justify-between items-center">
+              <h2 className="text-5xl font-black tracking-tighter">Asset Library</h2>
+              <button onClick={() => fileInputRef.current?.click()} className="px-10 py-5 bg-indigo-600 text-white rounded-[24px] font-black text-sm shadow-xl shadow-indigo-100">UPLOAD FILES</button>
+            </header>
+            <input type="file" ref={fileInputRef} className="hidden" multiple onChange={handleMediaUpload} />
+            
+            <div className="grid grid-cols-4 gap-8">
+              {mediaLibrary.map(item => (
+                <div key={item.id} className={`p-4 rounded-[40px] border shadow-sm group relative overflow-hidden transition-all hover:border-indigo-500 ${cardClass}`}>
+                   <div className="aspect-square rounded-[32px] overflow-hidden bg-slate-100 dark:bg-slate-700 mb-4">
+                      {/* Fixed line 457: Property access on 'item' is now safe due to MediaItem interface typing */}
+                      {item.type.startsWith('image/') ? <img src={item.data} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-4xl">📄</div>}
+                   </div>
+                   <div className="px-2">
+                      <div className="font-bold text-xs truncate mb-1">{item.name}</div>
+                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{item.type.split('/')[1]}</div>
+                   </div>
+                   <button 
+                    onClick={() => {
+                      const updated = mediaLibrary.filter(m => m.id !== item.id);
+                      setMediaLibrary(updated);
+                      localStorage.setItem(MEDIA_KEY, JSON.stringify(updated));
+                    }} 
+                    className="absolute top-6 right-6 w-10 h-10 bg-rose-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                   >✕</button>
                 </div>
               ))}
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'extensions' && !isEditing && (
-          <div className="space-y-8 animate-in fade-in duration-500">
-            <header className="flex justify-between items-center">
-              <h2 className="text-3xl font-black">Store Inventory</h2>
-              <button onClick={() => {setEditType('extension'); setExtForm({name: ''}); setIsEditing(true);}} className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold text-sm">Add Item</button>
-            </header>
-            <div className="grid grid-cols-2 gap-6">
-              {filteredExts.map(ext => (
-                <div key={ext.id} className={`p-6 rounded-3xl border flex items-center justify-between ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'} group hover:scale-[1.02] transition-all`}>
-                  <div className="flex items-center gap-5">
-                    <div className="text-4xl">{ext.icon}</div>
-                    <div>
-                      <div className="font-bold text-xl">{ext.name}</div>
-                      <div className="text-xs text-slate-400 font-bold uppercase tracking-widest">{ext.category} • {ext.users} users</div>
-                    </div>
-                  </div>
-                  <div className="flex gap-4">
-                    <button onClick={() => {setExtForm(ext); setEditType('extension'); setIsEditing(true);}} className="text-blue-600 font-bold text-xs">MOD</button>
-                    <button onClick={() => saveExtensions(extensions.filter(item => item.id !== ext.id))} className="text-rose-500 font-bold text-xs">DEL</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'studio' && <div className="animate-in fade-in duration-500"><BatchStudio /></div>}
-
-        {isEditing && editType === 'post' && (
-          <div className="max-w-4xl animate-in slide-in-from-bottom-12 duration-700">
-            <header className="flex justify-between items-center mb-12">
-              <button onClick={() => setIsEditing(false)} className="text-slate-500 font-bold hover:text-blue-600 transition-colors">← CANCEL EDITING</button>
-              <div className="flex gap-4">
-                <button onClick={generatePostDraft} disabled={aiLoading} className="px-6 py-3 bg-violet-600 text-white rounded-xl font-black text-xs shadow-xl shadow-violet-100">
-                  {aiLoading ? '🧙‍♂️ WRITING...' : '🪄 AI ASSISTANT'}
-                </button>
-                <button onClick={handleSavePost} className="px-10 py-3 bg-blue-600 text-white rounded-xl font-black text-xs shadow-xl shadow-blue-100">PUBLISH POST</button>
-              </div>
-            </header>
-            <div className={`p-16 rounded-[64px] border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'} shadow-2xl space-y-10`}>
-              <input type="text" className="w-full bg-transparent text-5xl font-black outline-none placeholder:text-slate-200" placeholder="Headline..." value={postForm.title} onChange={e => setPostForm({...postForm, title: e.target.value})} />
-              <div className="grid grid-cols-2 gap-8">
-                 <div className="space-y-4">
-                    <label className="text-[10px] font-black uppercase text-slate-400">Category</label>
-                    <input className={`w-full p-5 rounded-2xl border ${darkMode ? 'bg-slate-700 border-slate-600' : 'bg-slate-50 border-slate-100'} font-bold`} value={postForm.category} onChange={e => setPostForm({...postForm, category: e.target.value})} />
-                 </div>
-                 <div className="space-y-4">
-                    <label className="text-[10px] font-black uppercase text-slate-400">Image URL</label>
-                    <input className={`w-full p-5 rounded-2xl border ${darkMode ? 'bg-slate-700 border-slate-600' : 'bg-slate-50 border-slate-100'} font-bold`} value={postForm.image} onChange={e => setPostForm({...postForm, image: e.target.value})} />
-                 </div>
-              </div>
-              <textarea className={`w-full h-[500px] bg-transparent text-xl font-medium leading-relaxed outline-none resize-none border-t ${darkMode ? 'border-slate-700' : 'border-slate-100'} pt-10`} placeholder="Write (HTML supported)..." value={postForm.content} onChange={e => setPostForm({...postForm, content: e.target.value})} />
-            </div>
-          </div>
-        )}
-
-        {isEditing && editType === 'extension' && (
-          <div className="max-w-4xl animate-in slide-in-from-bottom-12 duration-700">
-            <header className="flex justify-between items-center mb-12">
-              <button onClick={() => setIsEditing(false)} className="text-slate-500 font-bold hover:text-blue-600 transition-colors">← CANCEL EDITING</button>
-              <button onClick={handleSaveExtension} className="px-10 py-3 bg-emerald-600 text-white rounded-xl font-black text-xs shadow-xl shadow-emerald-100">SAVE EXTENSION</button>
-            </header>
-            <div className={`p-16 rounded-[64px] border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'} shadow-2xl grid grid-cols-2 gap-12`}>
-              <div className="space-y-10">
-                <input type="text" className="w-full bg-transparent text-4xl font-black outline-none placeholder:text-slate-200" placeholder="Ext Name..." value={extForm.name} onChange={e => setExtForm({...extForm, name: e.target.value})} />
-                <input type="text" className={`w-full p-5 rounded-2xl border ${darkMode ? 'bg-slate-700 border-slate-600' : 'bg-slate-50 border-slate-100'} font-bold`} placeholder="Icon (Emoji)" value={extForm.icon} onChange={e => setExtForm({...extForm, icon: e.target.value})} />
-                <input type="text" className={`w-full p-5 rounded-2xl border ${darkMode ? 'bg-slate-700 border-slate-600' : 'bg-slate-50 border-slate-100'} font-bold`} placeholder="Store URL" value={extForm.storeUrl} onChange={e => setExtForm({...extForm, storeUrl: e.target.value})} />
-              </div>
-              <div className="space-y-10">
-                <textarea className={`w-full h-80 p-6 rounded-2xl border ${darkMode ? 'bg-slate-700 border-slate-600' : 'bg-slate-50 border-slate-100'} font-medium outline-none resize-none`} placeholder="Description..." value={extForm.longDescription} onChange={e => setExtForm({...extForm, longDescription: e.target.value})} />
-              </div>
             </div>
           </div>
         )}

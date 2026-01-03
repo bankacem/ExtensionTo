@@ -17,7 +17,6 @@ import AdminCMS from './AdminCMS';
 import { EXTENSIONS as STATIC_EXTENSIONS, BLOG_POSTS as STATIC_POSTS } from './constants';
 import { PageType, BlogPost, Extension } from './types';
 
-// Tracking Engine
 const trackEvent = (type: 'view' | 'click' | 'install', metadata?: any) => {
   const stats = JSON.parse(localStorage.getItem('et_analytics') || '[]');
   stats.push({
@@ -55,7 +54,7 @@ const App: React.FC = () => {
   }, [allPosts]);
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 800);
+    const timer = setTimeout(() => setIsLoading(false), 1000);
     return () => clearTimeout(timer);
   }, []);
 
@@ -77,7 +76,6 @@ const App: React.FC = () => {
         const ext = allExtensions.find((e: Extension) => e.id === id);
         if (ext) {
           updateSEO(ext.name, ext.shortDescription);
-          trackEvent('click', { itemId: id, category: 'extension' });
         }
         setSelectedExtensionId(id);
         setCurrentPage('detail');
@@ -86,38 +84,37 @@ const App: React.FC = () => {
         const post = visiblePosts.find((p: BlogPost) => p.id === id);
         if (post) {
           updateSEO(post.title, post.excerpt);
-          trackEvent('click', { itemId: id, category: 'blog' });
           setSelectedPostId(id);
           setCurrentPage('blog-post');
         } else {
           window.location.hash = '#blog';
         }
       } else if (hash === '#blog') {
-        updateSEO('Journal', 'Privacy news and expert guides for digital professionals.');
+        updateSEO('The Journal', 'Professional browser extension guides and privacy news.');
         setCurrentPage('blog');
       } else if (hash === '#cms') {
-        updateSEO('Admin Console', 'System Command Center');
+        updateSEO('System Command Center', 'Administrative dashboard.');
         setCurrentPage('cms');
       } else if (hash === '#privacy') {
-        updateSEO('Privacy Policy', 'We value your data sovereignty.');
+        updateSEO('Privacy Policy', 'Our commitment to your security.');
         setCurrentPage('privacy');
       } else if (hash === '#terms') {
-        updateSEO('Terms of Service', 'Transparent usage guidelines.');
+        updateSEO('Terms of Service', 'Platform usage guidelines.');
         setCurrentPage('terms');
       } else if (hash === '#features') {
-        updateSEO('Excellence Standards', 'Why professionals choose us.');
+        updateSEO('Standard of Excellence', 'Why professionals choose ExtensionTo.');
         setCurrentPage('features');
       } else if (hash === '#contact') {
         updateSEO('Contact Support', 'Human-to-human support.');
         setCurrentPage('contact');
       } else if (hash === '#help') {
-        updateSEO('Help Center', 'Extensive knowledge base.');
+        updateSEO('Help Center', 'Extension knowledge base.');
         setCurrentPage('help');
       } else if (hash === '#report-abuse') {
         updateSEO('Safety First', 'Report malicious content.');
         setCurrentPage('report-abuse');
       } else {
-        updateSEO('Home', 'Premium, Privacy-Focused Browser Extensions Hub.');
+        updateSEO('Premium Extensions', 'Curated, high-performance browser tools.');
         setCurrentPage('home');
       }
       window.scrollTo(0, 0);
@@ -136,12 +133,11 @@ const App: React.FC = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#020617]">
-        <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+        <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
 
-  // Handle Admin CMS Route Independently
   if (currentPage === 'cms') {
     return <AdminCMS onExit={() => navigateTo('#home')} />;
   }
