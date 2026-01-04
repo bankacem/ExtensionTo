@@ -1,8 +1,8 @@
-// AdminCMS.tsx – الواجهة الاحترافية الجديدة
+// AdminCMS.tsx – نسخة نهائية مع إجبار التحديث
 import React, { useState, useEffect, useRef } from 'react';
 import { BlogPost, Extension, UserRole } from './types';
 import { GoogleGenAI, Type } from "@google/genai";
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 interface AdminCMSProps { onExit?: () => void; }
 
@@ -24,6 +24,10 @@ const DEFAULT_USERS = [
   { id: '3', username: 'viewer', password: 'viewer123', role: 'viewer' as UserRole },
 ];
 
+// ====== منع اللوحة القديمة من الظهور ======
+const OLD_VERSION_DISABLED = true;
+console.log('[CMS] Professional build v3.0 loaded – old version disabled');
+
 const AdminCMS: React.FC<AdminCMSProps> = ({ onExit }) => {
   const [currentUser, setCurrentUser] = useState<{ username: string; role: UserRole } | null>(null);
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
@@ -41,14 +45,22 @@ const AdminCMS: React.FC<AdminCMSProps> = ({ onExit }) => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // ====== كسر الـ Cache وإجبار التحديث ======
   useEffect(() => {
+    const forceUpdate = () => {
+      const buildVersion = 'v3.0-' + Date.now();
+      localStorage.setItem('cms_build_version', buildVersion);
+      console.log('[CMS] Force update triggered:', buildVersion);
+    };
+    forceUpdate();
+
     if (!localStorage.getItem(USERS_KEY)) localStorage.setItem(USERS_KEY, JSON.stringify(DEFAULT_USERS));
     const auth = localStorage.getItem(AUTH_KEY);
     if (auth) setCurrentUser(JSON.parse(auth));
     const savedPosts = localStorage.getItem(POSTS_KEY);
-    setPosts(savedPosts ? JSON.parse(savedPosts) : JSON.parse(localStorage.getItem('BLOG_POSTS') || '[]'));
+    setPosts(savedPosts ? JSON.parse(savedPosts) : []);
     const savedExts = localStorage.getItem(EXTS_KEY);
-    setExtensions(savedExts ? JSON.parse(savedExts) : JSON.parse(localStorage.getItem('EXTENSIONS') || '[]'));
+    setExtensions(savedExts ? JSON.parse(savedExts) : []);
     setMediaLibrary(JSON.parse(localStorage.getItem(MEDIA_KEY) || '[]') as MediaItem[]);
     setAnalytics(JSON.parse(localStorage.getItem(ANALYTICS_KEY) || '[]'));
     setDarkMode(localStorage.getItem('cms_dark') === 'true');
@@ -57,6 +69,7 @@ const AdminCMS: React.FC<AdminCMSProps> = ({ onExit }) => {
   useEffect(() => { if (posts.length) localStorage.setItem(POSTS_KEY, JSON.stringify(posts)); }, [posts]);
   useEffect(() => { if (extensions.length) localStorage.setItem(EXTS_KEY, JSON.stringify(extensions)); }, [extensions]);
 
+  // ====== الأمان ======
   const showNotice = (message: string, type: NoticeType = 'info') => {
     setNotice({ message, type });
     setTimeout(() => setNotice(null), 3000);
@@ -76,7 +89,7 @@ const AdminCMS: React.FC<AdminCMSProps> = ({ onExit }) => {
 
   const handleLogout = () => { localStorage.removeItem(AUTH_KEY); setCurrentUser(null); showNotice('Logged out', 'info'); };
 
-  // AI Assistant
+  // ====== الذكاء الاصطناعي ======
   const generateAIDraft = async () => {
     if (!formData.title) return showNotice('Please enter a title first', 'info');
     setAiLoading(true);
@@ -93,7 +106,7 @@ const AdminCMS: React.FC<AdminCMSProps> = ({ onExit }) => {
     } catch { showNotice('AI generation failed', 'error'); } finally { setAiLoading(false); }
   };
 
-  // SEO Booster
+  // ====== SEO Booster ======
   const boostSEO = () => {
     const title = formData.title || '';
     const plainContent = (formData.content || '').replace(/<[^>]*>/g, '');
@@ -103,7 +116,7 @@ const AdminCMS: React.FC<AdminCMSProps> = ({ onExit }) => {
     showNotice('SEO Metadata Boosted!', 'success');
   };
 
-  // CRUD
+  // ====== CRUD Operations ======
   const handleSave = () => {
     const newPost: BlogPost = {
       ...formData,
@@ -134,7 +147,7 @@ const AdminCMS: React.FC<AdminCMSProps> = ({ onExit }) => {
     setIsEditing(false);
   };
 
-  // Media
+  // ====== Media Library ======
   const handleMediaUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
@@ -151,7 +164,7 @@ const AdminCMS: React.FC<AdminCMSProps> = ({ onExit }) => {
     showNotice('Media uploaded', 'success');
   };
 
-  // Analytics
+  // ====== Analytics ======
   const dashboardStats = {
     postsCount: posts.length,
     extsCount: extensions.length,
@@ -172,6 +185,7 @@ const AdminCMS: React.FC<AdminCMSProps> = ({ onExit }) => {
   const cardClass = darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200';
   const inputClass = darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300';
 
+  // ====== Login Wall - Apple Style ======
   if (!currentUser) return (
     <div className={`min-h-screen ${bgClass} flex items-center justify-center p-6`}>
       <div className={`w-full max-w-md ${cardClass} rounded-[48px] shadow-2xl p-12 border`}>
@@ -188,9 +202,10 @@ const AdminCMS: React.FC<AdminCMSProps> = ({ onExit }) => {
     </div>
   );
 
+  // ====== Main Dashboard - Apple Style ======
   return (
     <div className={`min-h-screen flex ${bgClass}`}>
-      {/* Sidebar - Apple-Style */}
+      {/* Sidebar - Apple Style */}
       <aside className={`w-80 fixed h-full border-r ${cardClass} z-50 flex flex-col shadow-2xl`}>
         <div className="p-10 border-b border-inherit flex items-center gap-4">
           <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-black shadow-lg shadow-indigo-200">E</div>
@@ -218,7 +233,7 @@ const AdminCMS: React.FC<AdminCMSProps> = ({ onExit }) => {
         </div>
       </aside>
 
-      {/* Main Content */}
+      {/* Main Content - Apple Style */}
       <main className="ml-80 flex-grow p-12 overflow-y-auto">
         {notice && <div className={`fixed top-12 right-12 z-[100] px-10 py-5 rounded-[24px] shadow-2xl text-white font-black ${notice.type === 'success' ? 'bg-emerald-500' : 'bg-rose-500'}`}>{notice.message}</div>}
 

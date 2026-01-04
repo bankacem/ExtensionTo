@@ -51,13 +51,6 @@ export type PageType =
 
 export type UserRole = 'admin' | 'editor' | 'viewer';
 
-export interface MediaItem {
-  id: string;
-  name: string;
-  data: string;
-  type: string;
-}
-
 export interface BatchItem {
   id: string;
   originalImage: string;
