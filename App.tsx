@@ -30,38 +30,34 @@ const trackEvent = (type: 'view' | 'click' | 'install', metadata?: any) => {
 };
 
 const App: React.FC = () => {
+  // ====== إجبار التحديث وكسر الـ Cache ======
+  useEffect(() => {
+    const forceUpdate = () => {
+      const buildVersion = 'v3.0-' + Date.now();
+      localStorage.setItem('cms_build_version', buildVersion);
+      console.log('[CMS] Force update triggered from App.tsx:', buildVersion);
+
+      // إعادة التحميل الكاملة مع كسر الـ Cache
+      if (window.location.hash === '#cms') {
+        window.location.replace(window.location.href.split('#')[0] + '#cms?v=' + Date.now());
+      }
+    };
+
+    // تنفيذ فوري عند الدخول للوحة التحكم
+    if (window.location.hash === '#cms') {
+      forceUpdate();
+    }
+  }, []);
   const [currentPage, setCurrentPage] = useState<PageType>('home');
   const [selectedExtensionId, setSelectedExtensionId] = useState<string | null>(null);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Cache busting and version control for Professional CMS
-  useEffect(() => {
-    const buildVersion = 'v3.0.0';
-    const currentStoredVersion = localStorage.getItem('et_app_version');
-    
-    if (currentStoredVersion !== buildVersion) {
-      console.log(`[App] New version detected: ${buildVersion}. Updating local registry...`);
-      localStorage.setItem('et_app_version', buildVersion);
-      // Optional: Clear specific stale cache if needed
-    }
-
-    if (window.location.hash === '#cms') {
-      const lastCmsVisit = localStorage.getItem('et_cms_last_visit');
-      const now = Date.now();
-      // If it's been more than an hour or first time, force a soft refresh to ensure latest CMS assets
-      if (!lastCmsVisit || (now - parseInt(lastCmsVisit)) > 3600000) {
-        localStorage.setItem('et_cms_last_visit', now.toString());
-        console.log('[CMS] Refreshing environment for Professional Admin Suite...');
-      }
-    }
-  }, []);
-
   // Dynamic Content Loading (Synchronized with AdminCMS)
   const allPosts = useMemo(() => {
     const saved = localStorage.getItem('cms_blog_posts');
     return saved ? JSON.parse(saved) : STATIC_POSTS;
-  }, [currentPage]); 
+  }, [currentPage]);
 
   const allExtensions = useMemo(() => {
     const saved = localStorage.getItem('cms_extensions');
@@ -76,7 +72,7 @@ const App: React.FC = () => {
   }, [allPosts]);
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 800);
+    const timer = setTimeout(() => setIsLoading(false), 1000);
     return () => clearTimeout(timer);
   }, []);
 
@@ -115,28 +111,28 @@ const App: React.FC = () => {
         updateSEO('The Journal', 'Professional browser extension guides and privacy news.');
         setCurrentPage('blog');
       } else if (hash === '#cms') {
-        updateSEO('System Console', 'Professional Administrative command center.');
+        updateSEO('System Command Center', 'Administrative dashboard.');
         setCurrentPage('cms');
       } else if (hash === '#privacy') {
-        updateSEO('Privacy Policy', 'Data sovereignty guidelines.');
+        updateSEO('Privacy Policy', 'Our commitment to your security.');
         setCurrentPage('privacy');
       } else if (hash === '#terms') {
-        updateSEO('Terms of Service', 'Platform usage standards.');
+        updateSEO('Terms of Service', 'Platform usage guidelines.');
         setCurrentPage('terms');
       } else if (hash === '#features') {
-        updateSEO('Standard of Excellence', 'Why professionals choose our directory.');
+        updateSEO('Standard of Excellence', 'Why professionals choose ExtensionTo.');
         setCurrentPage('features');
       } else if (hash === '#contact') {
-        updateSEO('Contact', 'Get in touch with the ExtensionTo team.');
+        updateSEO('Contact Support', 'Human-to-human support.');
         setCurrentPage('contact');
       } else if (hash === '#help') {
-        updateSEO('Help Center', 'Knowledge base and FAQ.');
+        updateSEO('Help Center', 'Extension knowledge base.');
         setCurrentPage('help');
       } else if (hash === '#report-abuse') {
-        updateSEO('Report Abuse', 'Safety first protocol.');
+        updateSEO('Safety First', 'Report malicious content.');
         setCurrentPage('report-abuse');
       } else {
-        updateSEO('Premium Extensions', 'Curated browser tools for professionals.');
+        updateSEO('Premium Extensions', 'Curated, high-performance browser tools.');
         setCurrentPage('home');
       }
       window.scrollTo(0, 0);
@@ -155,15 +151,11 @@ const App: React.FC = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#020617]">
-        <div className="relative">
-          <div className="w-16 h-16 border-4 border-blue-600/20 rounded-full"></div>
-          <div className="absolute top-0 left-0 w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-        </div>
+        <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
 
-  // Handle Admin CMS Route Independently (No Layout)
   if (currentPage === 'cms') {
     return <AdminCMS onExit={() => navigateTo('#home')} />;
   }
@@ -174,27 +166,27 @@ const App: React.FC = () => {
   return (
     <Layout onNavigate={navigateTo} currentPage={currentPage}>
       {currentPage === 'home' && (
-        <Home 
-          extensions={allExtensions} 
-          onSelect={(id) => navigateTo(`#detail/${id}`)} 
+        <Home
+          extensions={allExtensions}
+          onSelect={(id) => navigateTo(`#detail/${id}`)}
         />
       )}
       {currentPage === 'detail' && selectedExtension && (
-        <Detail 
-          extension={selectedExtension} 
-          onBack={() => navigateTo('#home')} 
+        <Detail
+          extension={selectedExtension}
+          onBack={() => navigateTo('#home')}
         />
       )}
       {currentPage === 'blog' && (
-        <Blog 
-          posts={visiblePosts} 
-          onPostSelect={(id) => navigateTo(`#blog/${id}`)} 
+        <Blog
+          posts={visiblePosts}
+          onPostSelect={(id) => navigateTo(`#blog/${id}`)}
         />
       )}
       {currentPage === 'blog-post' && selectedPost && (
-        <BlogPostDetail 
-          post={selectedPost} 
-          onBack={() => navigateTo('#blog')} 
+        <BlogPostDetail
+          post={selectedPost}
+          onBack={() => navigateTo('#blog')}
         />
       )}
       {currentPage === 'privacy' && <Privacy />}
