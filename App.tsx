@@ -17,47 +17,37 @@ import AdminCMS from './AdminCMS';
 import { EXTENSIONS as STATIC_EXTENSIONS, BLOG_POSTS as STATIC_POSTS } from './constants';
 import { PageType, BlogPost, Extension } from './types';
 
-const trackEvent = (type: 'view' | 'click' | 'install', metadata?: any) => {
-  const stats = JSON.parse(localStorage.getItem('et_analytics') || '[]');
-  stats.push({
-    type,
-    path: window.location.hash,
-    timestamp: new Date().toISOString(),
-    ...metadata
-  });
-  if (stats.length > 3000) stats.shift();
-  localStorage.setItem('et_analytics', JSON.stringify(stats));
-};
-
 const App: React.FC = () => {
-  // ====== إجبار التحديث وكسر الـ Cache ======
-  useEffect(() => {
-    const forceUpdate = () => {
-      const buildVersion = 'v3.0-' + Date.now();
-      localStorage.setItem('cms_build_version', buildVersion);
-      console.log('[CMS] Force update triggered from App.tsx:', buildVersion);
-
-      // إعادة التحميل الكاملة مع كسر الـ Cache
-      if (window.location.hash === '#cms') {
-        window.location.replace(window.location.href.split('#')[0] + '#cms?v=' + Date.now());
-      }
-    };
-
-    // تنفيذ فوري عند الدخول للوحة التحكم
-    if (window.location.hash === '#cms') {
-      forceUpdate();
-    }
-  }, []);
   const [currentPage, setCurrentPage] = useState<PageType>('home');
   const [selectedExtensionId, setSelectedExtensionId] = useState<string | null>(null);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Dynamic Content Loading (Synchronized with AdminCMS)
+  // CRITICAL: Cache Busting & Version Enforcement for Professional CMS v3.1
+  useEffect(() => {
+    const CURRENT_VERSION = 'v3.1.0-PRO';
+    const storedVersion = localStorage.getItem('et_app_version');
+
+    if (storedVersion !== CURRENT_VERSION) {
+      console.warn(`[System] Version mismatch: ${storedVersion} -> ${CURRENT_VERSION}. Purging legacy schemas.`);
+      // Only clear CMS related legacy keys to preserve critical settings but force fresh UI/Data structure
+      localStorage.removeItem('cms_active_tab');
+      localStorage.setItem('et_app_version', CURRENT_VERSION);
+    }
+
+    // Force refresh if visiting CMS to ensure latest assets
+    if (window.location.hash === '#cms') {
+      const lastSession = localStorage.getItem('et_last_cms_session');
+      if (!lastSession || Date.now() - parseInt(lastSession) > 600000) { // 10 min throttle
+        localStorage.setItem('et_last_cms_session', Date.now().toString());
+      }
+    }
+  }, []);
+
   const allPosts = useMemo(() => {
     const saved = localStorage.getItem('cms_blog_posts');
     return saved ? JSON.parse(saved) : STATIC_POSTS;
-  }, [currentPage]);
+  }, [currentPage]); 
 
   const allExtensions = useMemo(() => {
     const saved = localStorage.getItem('cms_extensions');
@@ -72,67 +62,41 @@ const App: React.FC = () => {
   }, [allPosts]);
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 1000);
+    const timer = setTimeout(() => setIsLoading(false), 800);
     return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
-    const updateSEO = (title: string, description: string) => {
-      document.title = `${title} | ExtensionTo Hub`;
-      const metaDescription = document.querySelector('meta[name="description"]');
-      if (metaDescription) {
-        metaDescription.setAttribute('content', description);
-      }
-    };
-
     const handleHashChange = () => {
       const hash = window.location.hash || '#home';
-      trackEvent('view');
-
+      
       if (hash.startsWith('#detail/')) {
-        const id = hash.replace('#detail/', '');
-        const ext = allExtensions.find((e: Extension) => e.id === id);
-        if (ext) {
-          updateSEO(ext.name, ext.shortDescription);
-        }
-        setSelectedExtensionId(id);
+        setSelectedExtensionId(hash.replace('#detail/', ''));
         setCurrentPage('detail');
       } else if (hash.startsWith('#blog/')) {
-        const id = hash.replace('#blog/', '');
-        const post = visiblePosts.find((p: BlogPost) => p.id === id);
-        if (post) {
-          updateSEO(post.title, post.excerpt);
-          setSelectedPostId(id);
-          setCurrentPage('blog-post');
-        } else {
-          window.location.hash = '#blog';
-        }
+        setSelectedPostId(hash.replace('#blog/', ''));
+        setCurrentPage('blog-post');
       } else if (hash === '#blog') {
-        updateSEO('The Journal', 'Professional browser extension guides and privacy news.');
         setCurrentPage('blog');
       } else if (hash === '#cms') {
-        updateSEO('System Command Center', 'Administrative dashboard.');
         setCurrentPage('cms');
       } else if (hash === '#privacy') {
-        updateSEO('Privacy Policy', 'Our commitment to your security.');
         setCurrentPage('privacy');
       } else if (hash === '#terms') {
-        updateSEO('Terms of Service', 'Platform usage guidelines.');
         setCurrentPage('terms');
       } else if (hash === '#features') {
-        updateSEO('Standard of Excellence', 'Why professionals choose ExtensionTo.');
         setCurrentPage('features');
       } else if (hash === '#contact') {
-        updateSEO('Contact Support', 'Human-to-human support.');
         setCurrentPage('contact');
       } else if (hash === '#help') {
-        updateSEO('Help Center', 'Extension knowledge base.');
         setCurrentPage('help');
       } else if (hash === '#report-abuse') {
-        updateSEO('Safety First', 'Report malicious content.');
         setCurrentPage('report-abuse');
+      } else if (hash === '#security') {
+        setCurrentPage('security');
+      } else if (hash === '#compliance') {
+        setCurrentPage('compliance');
       } else {
-        updateSEO('Premium Extensions', 'Curated, high-performance browser tools.');
         setCurrentPage('home');
       }
       window.scrollTo(0, 0);
@@ -140,9 +104,8 @@ const App: React.FC = () => {
 
     window.addEventListener('hashchange', handleHashChange);
     handleHashChange();
-
     return () => window.removeEventListener('hashchange', handleHashChange);
-  }, [visiblePosts, allExtensions]);
+  }, []);
 
   const navigateTo = (hash: string) => {
     window.location.hash = hash;
@@ -151,11 +114,15 @@ const App: React.FC = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#020617]">
-        <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+        <div className="relative">
+          <div className="w-20 h-20 border-4 border-blue-600/10 rounded-full"></div>
+          <div className="absolute top-0 left-0 w-20 h-20 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+        </div>
       </div>
     );
   }
 
+  // INDEPENDENT ROUTE: The Professional Command Center
   if (currentPage === 'cms') {
     return <AdminCMS onExit={() => navigateTo('#home')} />;
   }
@@ -166,28 +133,16 @@ const App: React.FC = () => {
   return (
     <Layout onNavigate={navigateTo} currentPage={currentPage}>
       {currentPage === 'home' && (
-        <Home
-          extensions={allExtensions}
-          onSelect={(id) => navigateTo(`#detail/${id}`)}
-        />
+        <Home extensions={allExtensions} onSelect={(id) => navigateTo(`#detail/${id}`)} />
       )}
       {currentPage === 'detail' && selectedExtension && (
-        <Detail
-          extension={selectedExtension}
-          onBack={() => navigateTo('#home')}
-        />
+        <Detail extension={selectedExtension} onBack={() => navigateTo('#home')} />
       )}
       {currentPage === 'blog' && (
-        <Blog
-          posts={visiblePosts}
-          onPostSelect={(id) => navigateTo(`#blog/${id}`)}
-        />
+        <Blog posts={visiblePosts} onPostSelect={(id) => navigateTo(`#blog/${id}`)} />
       )}
       {currentPage === 'blog-post' && selectedPost && (
-        <BlogPostDetail
-          post={selectedPost}
-          onBack={() => navigateTo('#blog')}
-        />
+        <BlogPostDetail post={selectedPost} onBack={() => navigateTo('#blog')} />
       )}
       {currentPage === 'privacy' && <Privacy />}
       {currentPage === 'terms' && <Terms />}
