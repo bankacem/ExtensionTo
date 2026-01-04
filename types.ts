@@ -19,13 +19,13 @@ export interface BlogPost {
   id: string;
   title: string;
   excerpt: string;
-  content: string; // Supports HTML
+  content: string;
   category: string;
   tags?: string;
-  date: string; // Display date
-  publishDate: string; // ISO format for scheduling
+  date: string;
+  publishDate: string;
   readTime: string;
-  image: string; // URL or Emoji
+  image: string;
   featured?: boolean;
   status?: 'draft' | 'published' | 'scheduled';
   seoTitle?: string;
@@ -46,7 +46,7 @@ export type PageType =
   | 'contact' 
   | 'help' 
   | 'report-abuse'
-  | 'cms'
+  | 'suite' // New Professional Suite Route
   | 'batch-studio';
 
 export type UserRole = 'admin' | 'editor' | 'viewer';

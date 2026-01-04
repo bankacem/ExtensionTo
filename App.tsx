@@ -23,24 +23,24 @@ const App: React.FC = () => {
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // CRITICAL: Cache Busting & Version Enforcement for Professional CMS v3.1
+  // CRITICAL: Cache Purge & Route Migration
   useEffect(() => {
-    const CURRENT_VERSION = 'v3.1.0-PRO';
-    const storedVersion = localStorage.getItem('et_app_version');
+    const hash = window.location.hash;
 
-    if (storedVersion !== CURRENT_VERSION) {
-      console.warn(`[System] Version mismatch: ${storedVersion} -> ${CURRENT_VERSION}. Purging legacy schemas.`);
-      // Only clear CMS related legacy keys to preserve critical settings but force fresh UI/Data structure
-      localStorage.removeItem('cms_active_tab');
-      localStorage.setItem('et_app_version', CURRENT_VERSION);
-    }
-
-    // Force refresh if visiting CMS to ensure latest assets
-    if (window.location.hash === '#cms') {
-      const lastSession = localStorage.getItem('et_last_cms_session');
-      if (!lastSession || Date.now() - parseInt(lastSession) > 600000) { // 10 min throttle
-        localStorage.setItem('et_last_cms_session', Date.now().toString());
-      }
+    // 1. Force Redirect from old #cms to new #suite
+    if (hash === '#cms') {
+      console.warn('[System] Legacy route detected. Migrating to Professional Suite...');
+      
+      // 2. Clear ONLY legacy UI keys to ensure fresh Professional UI loads
+      const legacyKeys = ['cms_active_tab', 'cms_view', 'cms_editing_post'];
+      legacyKeys.forEach(k => localStorage.removeItem(k));
+      
+      // 3. Set a fresh build flag
+      localStorage.setItem('et_suite_v3_active', 'true');
+      
+      // 4. Redirect
+      window.location.hash = '#suite';
+      return;
     }
   }, []);
 
@@ -78,8 +78,8 @@ const App: React.FC = () => {
         setCurrentPage('blog-post');
       } else if (hash === '#blog') {
         setCurrentPage('blog');
-      } else if (hash === '#cms') {
-        setCurrentPage('cms');
+      } else if (hash === '#suite') {
+        setCurrentPage('suite');
       } else if (hash === '#privacy') {
         setCurrentPage('privacy');
       } else if (hash === '#terms') {
@@ -114,16 +114,13 @@ const App: React.FC = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#020617]">
-        <div className="relative">
-          <div className="w-20 h-20 border-4 border-blue-600/10 rounded-full"></div>
-          <div className="absolute top-0 left-0 w-20 h-20 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-        </div>
+        <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
 
-  // INDEPENDENT ROUTE: The Professional Command Center
-  if (currentPage === 'cms') {
+  // Use the new Suite Route
+  if (currentPage === 'suite') {
     return <AdminCMS onExit={() => navigateTo('#home')} />;
   }
 

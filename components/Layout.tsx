@@ -18,7 +18,7 @@ const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPage }) =>
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="sticky top-0 z-50 glass-header border-b border-gray-100">
+      <header className="sticky top-0 z-50 glass-header border-b border-gray-100 bg-white/80 backdrop-blur-md">
         <nav className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <div 
             className="flex items-center gap-2 cursor-pointer"
@@ -62,11 +62,11 @@ const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPage }) =>
         </nav>
 
         {isMobileMenuOpen && (
-          <div className="md:hidden bg-white p-6 border-b border-gray-100 flex flex-col gap-4">
+          <div className="md:hidden bg-white p-6 border-b border-gray-100 flex flex-col gap-4 animate-in slide-in-from-top duration-300">
             {navLinks.map((link) => (
-              <button key={link.hash} onClick={() => { onNavigate(link.hash); setIsMobileMenuOpen(false); }} className="text-left font-bold text-gray-900">{link.label}</button>
+              <button key={link.hash} onClick={() => { onNavigate(link.hash); setIsMobileMenuOpen(false); }} className="text-left font-bold text-gray-900 py-2">{link.label}</button>
             ))}
-            <a href={BRAND_LINKS.mainSite} className="font-bold text-blue-600">Main Site ↗</a>
+            <a href={BRAND_LINKS.mainSite} className="font-bold text-blue-600 py-2">Main Site ↗</a>
           </div>
         )}
       </header>
@@ -86,18 +86,19 @@ const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPage }) =>
           <div>
             <h4 className="text-gray-900 font-bold mb-4">Quick Links</h4>
             <ul className="space-y-2">
-              <li><button onClick={() => onNavigate('#home')} className="hover:text-blue-600">Browse Store</button></li>
-              <li><button onClick={() => onNavigate('#blog')} className="hover:text-blue-600">Latest News</button></li>
-              <li><button onClick={() => onNavigate('#features')} className="hover:text-blue-600">Features</button></li>
+              <li><button onClick={() => onNavigate('#home')} className="hover:text-blue-600 text-left">Browse Store</button></li>
+              <li><button onClick={() => onNavigate('#blog')} className="hover:text-blue-600 text-left">Latest News</button></li>
+              <li><button onClick={() => onNavigate('#features')} className="hover:text-blue-600 text-left">Features</button></li>
             </ul>
           </div>
           <div>
             <h4 className="text-gray-900 font-bold mb-4">Support & Admin</h4>
             <ul className="space-y-2">
-              <li><button onClick={() => onNavigate('#help')} className="hover:text-blue-600">Help Center</button></li>
-              <li><button onClick={() => onNavigate('#privacy')} className="hover:text-blue-600">Privacy</button></li>
-              <li><button onClick={() => onNavigate('#cms')} className="text-blue-600 font-bold hover:underline">Admin Console (CMS) ⚙️</button></li>
-              <li><button onClick={() => onNavigate('#report-abuse')} className="hover:text-red-600">Report Issue</button></li>
+              <li><button onClick={() => onNavigate('#help')} className="hover:text-blue-600 text-left">Help Center</button></li>
+              <li><button onClick={() => onNavigate('#privacy')} className="hover:text-blue-600 text-left">Privacy</button></li>
+              {/* UPDATED ROUTE TO #suite */}
+              <li><button onClick={() => onNavigate('#suite')} className="text-blue-600 font-black hover:underline text-left">Professional Suite (CMS) ⚙️</button></li>
+              <li><button onClick={() => onNavigate('#report-abuse')} className="hover:text-red-600 text-left">Report Issue</button></li>
             </ul>
           </div>
         </div>
